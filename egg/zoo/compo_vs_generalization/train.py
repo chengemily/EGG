@@ -129,8 +129,12 @@ class DiffLoss(torch.nn.Module):
                 )
 
                 n_attributes = self.n_attributes - 1
+
+                # Tensor: batch_size x n_attributes (a batch of objects, each with n attributes)
                 attr_acc = (
+                    # average across a batch of objects
                     (
+                        # whether the listener got all the attributes right in one vector (about an object)
                         (
                             no_attribute_output.argmax(dim=-1)
                             == no_attribute_input.argmax(dim=-1)
@@ -142,7 +146,9 @@ class DiffLoss(torch.nn.Module):
                 )
                 acc += attr_acc
 
+                #
                 attr_acc_or = (
+                    # average score on an attribute (averaged across all attributes and objects in the batch)
                     (
                         no_attribute_output.argmax(dim=-1)
                         == no_attribute_input.argmax(dim=-1)
@@ -163,7 +169,9 @@ class DiffLoss(torch.nn.Module):
             acc /= self.n_attributes
             acc_or /= self.n_attributes
         else:
+            print('received_output.argmax = sender_input.argmax: ', receiver_output.argmax(dim=-1) == sender_input.argmax(dim=-1))
             acc = (
+                # whether the listener got all the attributes right in one vector (about an object), batch_size x 1
                 torch.sum(
                     (
                         receiver_output.argmax(dim=-1) == sender_input.argmax(dim=-1)
@@ -172,9 +180,13 @@ class DiffLoss(torch.nn.Module):
                 )
                 == self.n_attributes
             ).float()
+
+            # whether the listener got each attribute right: batch_size x n_attributes
             acc_or = (
                 receiver_output.argmax(dim=-1) == sender_input.argmax(dim=-1)
             ).float()
+
+            print('acc_or,', acc_or)
 
             receiver_output = receiver_output.view(
                 batch_size * self.n_attributes, self.n_values
@@ -186,6 +198,8 @@ class DiffLoss(torch.nn.Module):
                 .mean(dim=-1)
             )
 
+        # acc_or: in [0, 1], on average over each attribute, whether the prediction is correct
+        # acc: whether the
         return loss, {"acc": acc, "acc_or": acc_or}
 
 
