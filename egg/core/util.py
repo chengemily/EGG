@@ -136,6 +136,7 @@ def _get_params(
     # just to avoid confusion and be consistent
     args.no_cuda = not args.cuda
     args.device = torch.device("cuda" if args.cuda else "cpu")
+    print('USING DEVICE:', args.device)
     args.distributed_context = maybe_init_distributed(args)
 
     if args.fp16 and torch.__version__ < "1.6.0":

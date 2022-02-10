@@ -6,7 +6,7 @@
 import argparse
 import copy
 import json
-
+import pickle
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
@@ -82,8 +82,14 @@ def get_params(params):
     parser.add_argument(
         "--early_stopping_thr",
         type=float,
-        default=0.99999,
+        default=0.95,
         help="Early stopping threshold on accuracy (defautl: 0.99999)",
+    )
+    parser.add_argument(
+        "--save",
+        type=bool,
+        default=False,
+        help="Set True if you want model to be saved",
     )
 
     args = core.init(arg_parser=parser, params=params)
@@ -169,7 +175,6 @@ class DiffLoss(torch.nn.Module):
             acc /= self.n_attributes
             acc_or /= self.n_attributes
         else:
-            print('received_output.argmax = sender_input.argmax: ', receiver_output.argmax(dim=-1) == sender_input.argmax(dim=-1))
             acc = (
                 # whether the listener got all the attributes right in one vector (about an object), batch_size x 1
                 torch.sum(
@@ -186,8 +191,6 @@ class DiffLoss(torch.nn.Module):
                 receiver_output.argmax(dim=-1) == sender_input.argmax(dim=-1)
             ).float()
 
-            print('acc_or,', acc_or)
-
             receiver_output = receiver_output.view(
                 batch_size * self.n_attributes, self.n_values
             )
@@ -203,7 +206,7 @@ class DiffLoss(torch.nn.Module):
         return loss, {"acc": acc, "acc_or": acc_or}
 
 
-def main(params):
+def main(params, train_mode=True):
     import copy
 
     opts = get_params(params)
@@ -311,8 +314,12 @@ def main(params):
         )
     )
 
+    prefix = 'randomseed_{}'.format(
+        opts.random_seed, opts.n_attributes, opts.n_values, opts.max_len, opts.vocab_size)
     holdout_evaluator = Evaluator(loaders, opts.device, freq=0)
     early_stopper = EarlyStopperAccuracy(opts.early_stopping_thr, validation=True)
+    checkpoint_saver = core.CheckpointSaver(
+        checkpoint_path=opts.checkpoint_dir, checkpoint_freq=opts.checkpoint_freq, prefix=prefix)
 
     trainer = core.Trainer(
         game=game,
@@ -324,123 +331,146 @@ def main(params):
             early_stopper,
             metrics_evaluator,
             holdout_evaluator,
+            core.TensorboardLogger(),
+            checkpoint_saver
         ],
     )
-    trainer.train(n_epochs=opts.n_epochs)
 
-    last_epoch_interaction = early_stopper.validation_stats[-1][1]
-    validation_acc = last_epoch_interaction.aux["acc"].mean()
+    if train_mode:
+        trainer.train(n_epochs=opts.n_epochs)
+        last_interaction = early_stopper.validation_stats[-1][1]
+        uniformtest_acc = holdout_evaluator.results["uniform holdout"]["acc"]
+        uniformtest_acc_or = holdout_evaluator.results["uniform holdout"]["acc_or"]
+        generalization_acc = holdout_evaluator.results['generalization hold out']['acc']
+        generalization_acc_or = holdout_evaluator.results['generalization hold out']['acc_or']
+    else:
+        loss, last_interaction = trainer.eval()
 
-    uniformtest_acc = holdout_evaluator.results["uniform holdout"]["acc"]
-
+    validation_acc = last_interaction.aux["acc"].mean()
+    validation_acc_or = last_interaction.aux["acc_or"].mean()
     # Train new agents
-    if validation_acc > 0.99:
-
-        def _set_seed(seed):
-            import random
-
-            import numpy as np
-
-            random.seed(seed)
-            torch.manual_seed(seed)
-            np.random.seed(seed)
-            if torch.cuda.is_available():
-                torch.cuda.manual_seed_all(seed)
-
-        core.get_opts().preemptable = False
-        core.get_opts().checkpoint_path = None
-
-        # freeze Sender and probe how fast a simple Receiver will learn the thing
-        def retrain_receiver(receiver_generator, sender):
-            receiver = receiver_generator()
-            game = core.SenderReceiverRnnReinforce(
-                sender,
-                receiver,
-                loss,
-                sender_entropy_coeff=0.0,
-                receiver_entropy_coeff=0.0,
-            )
-            optimizer = torch.optim.Adam(receiver.parameters(), lr=opts.lr)
-            early_stopper = EarlyStopperAccuracy(
-                opts.early_stopping_thr, validation=True
-            )
-
-            trainer = core.Trainer(
-                game=game,
-                optimizer=optimizer,
-                train_data=train_loader,
-                validation_data=validation_loader,
-                callbacks=[early_stopper, Evaluator(loaders, opts.device, freq=0)],
-            )
-            trainer.train(n_epochs=opts.n_epochs // 2)
-
-            accs = [x[1]["acc"] for x in early_stopper.validation_stats]
-            return accs
-
-        frozen_sender = Freezer(copy.deepcopy(sender))
-
-        def gru_receiver_generator():
-            return core.RnnReceiverDeterministic(
-                Receiver(n_hidden=opts.receiver_hidden, n_outputs=n_dim),
-                opts.vocab_size + 1,
-                opts.receiver_emb,
-                hidden_size=opts.receiver_hidden,
-                cell="gru",
-            )
-
-        def small_gru_receiver_generator():
-            return core.RnnReceiverDeterministic(
-                Receiver(n_hidden=100, n_outputs=n_dim),
-                opts.vocab_size + 1,
-                opts.receiver_emb,
-                hidden_size=100,
-                cell="gru",
-            )
-
-        def tiny_gru_receiver_generator():
-            return core.RnnReceiverDeterministic(
-                Receiver(n_hidden=50, n_outputs=n_dim),
-                opts.vocab_size + 1,
-                opts.receiver_emb,
-                hidden_size=50,
-                cell="gru",
-            )
-
-        def nonlinear_receiver_generator():
-            return NonLinearReceiver(
-                n_outputs=n_dim,
-                vocab_size=opts.vocab_size + 1,
-                max_length=opts.max_len,
-                n_hidden=opts.receiver_hidden,
-            )
-
-        for name, receiver_generator in [
-            ("gru", gru_receiver_generator),
-            ("nonlinear", nonlinear_receiver_generator),
-            ("tiny_gru", tiny_gru_receiver_generator),
-            ("small_gru", small_gru_receiver_generator),
-        ]:
-
-            for seed in range(17, 17 + 3):
-                _set_seed(seed)
-                accs = retrain_receiver(receiver_generator, frozen_sender)
-                accs += [1.0] * (opts.n_epochs // 2 - len(accs))
-                auc = sum(accs)
-                print(
-                    json.dumps(
-                        {
-                            "mode": "reset",
-                            "seed": seed,
-                            "receiver_name": name,
-                            "auc": auc,
-                        }
-                    )
-                )
+    # if validation_acc > 0.99:
+    #
+    #     def _set_seed(seed):
+    #         import random
+    #
+    #         import numpy as np
+    #
+    #         random.seed(seed)
+    #         torch.manual_seed(seed)
+    #         np.random.seed(seed)
+    #         if torch.cuda.is_available():
+    #             torch.cuda.manual_seed_all(seed)
+    #
+    #     core.get_opts().preemptable = False
+    #     core.get_opts().checkpoint_path = None
+    #
+    #     # freeze Sender and probe how fast a simple Receiver will learn the thing
+    #     def retrain_receiver(receiver_generator, sender):
+    #         receiver = receiver_generator()
+    #         game = core.SenderReceiverRnnReinforce(
+    #             sender,
+    #             receiver,
+    #             loss,
+    #             sender_entropy_coeff=0.0,
+    #             receiver_entropy_coeff=0.0,
+    #         )
+    #         optimizer = torch.optim.Adam(receiver.parameters(), lr=opts.lr)
+    #         early_stopper = EarlyStopperAccuracy(
+    #             opts.early_stopping_thr, validation=True
+    #         )
+    #
+    #         trainer = core.Trainer(
+    #             game=game,
+    #             optimizer=optimizer,
+    #             train_data=train_loader,
+    #             validation_data=validation_loader,
+    #             callbacks=[early_stopper, Evaluator(loaders, opts.device, freq=0)],
+    #         )
+    #         trainer.train(n_epochs=opts.n_epochs // 2)
+    #
+    #         accs = [x[1]["acc"] for x in early_stopper.validation_stats]
+    #         return accs
+    #
+    #     frozen_sender = Freezer(copy.deepcopy(sender))
+    #
+    #     def gru_receiver_generator():
+    #         return core.RnnReceiverDeterministic(
+    #             Receiver(n_hidden=opts.receiver_hidden, n_outputs=n_dim),
+    #             opts.vocab_size + 1,
+    #             opts.receiver_emb,
+    #             hidden_size=opts.receiver_hidden,
+    #             cell="gru",
+    #         )
+    #
+    #     def small_gru_receiver_generator():
+    #         return core.RnnReceiverDeterministic(
+    #             Receiver(n_hidden=100, n_outputs=n_dim),
+    #             opts.vocab_size + 1,
+    #             opts.receiver_emb,
+    #             hidden_size=100,
+    #             cell="gru",
+    #         )
+    #
+    #     def tiny_gru_receiver_generator():
+    #         return core.RnnReceiverDeterministic(
+    #             Receiver(n_hidden=50, n_outputs=n_dim),
+    #             opts.vocab_size + 1,
+    #             opts.receiver_emb,
+    #             hidden_size=50,
+    #             cell="gru",
+    #         )
+    #
+    #     def nonlinear_receiver_generator():
+    #         return NonLinearReceiver(
+    #             n_outputs=n_dim,
+    #             vocab_size=opts.vocab_size + 1,
+    #             max_length=opts.max_len,
+    #             n_hidden=opts.receiver_hidden,
+    #         )
+    #
+    #     for name, receiver_generator in [
+    #         ("gru", gru_receiver_generator),
+    #         ("nonlinear", nonlinear_receiver_generator),
+    #         ("tiny_gru", tiny_gru_receiver_generator),
+    #         ("small_gru", small_gru_receiver_generator),
+    #     ]:
+    #
+    #         for seed in range(17, 17 + 3):
+    #             _set_seed(seed)
+    #             accs = retrain_receiver(receiver_generator, frozen_sender)
+    #             accs += [1.0] * (opts.n_epochs // 2 - len(accs))
+    #             auc = sum(accs)
+    #             print(
+    #                 json.dumps(
+    #                     {
+    #                         "mode": "reset",
+    #                         "seed": seed,
+    #                         "receiver_name": name,
+    #                         "auc": auc,
+    #                     }
+    #                 )
+    #             )
 
     print("---End--")
 
-    core.close()
+    if train_mode and opts.save:
+        # save model checkpoint (see trainers.py)
+        with open('/home/echeng/EGG/saved_models/checkpoint_wrapper_randomseed{}.pkl'.format(opts.random_seed),
+                  'wb') as f:
+            pickle.dump({
+                'checkpoint_path': opts.checkpoint_dir + prefix + '_final.tar',
+                'validation_acc': validation_acc.item(),
+                'validation_acc_or': validation_acc_or.item(),
+                'uniformtest_acc': uniformtest_acc,
+                'uniformtest_acc_or': uniformtest_acc_or,
+                'generalization_acc': generalization_acc,
+                'generalization_acc_or': generalization_acc_or,
+                'last_validation_compo_metrics': metrics_evaluator.stats,
+                'params': params
+            }, f)
 
+    core.close()
 
 if __name__ == "__main__":
     import sys
