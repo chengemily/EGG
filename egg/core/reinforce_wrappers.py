@@ -308,6 +308,7 @@ class RnnSenderReinforce(nn.Module):
         input = torch.stack([self.sos_embedding] * x.size(0))
 
         sequence = []
+        predicted_dist = []
         logits = []
         entropy = []
 
@@ -322,6 +323,8 @@ class RnnSenderReinforce(nn.Module):
                 input = h_t
 
             step_logits = F.log_softmax(self.hidden_to_output(h_t), dim=1)
+            predicted_dist.append(step_logits)
+
             distr = Categorical(logits=step_logits)
             entropy.append(distr.entropy())
 
@@ -334,6 +337,7 @@ class RnnSenderReinforce(nn.Module):
             input = self.embedding(x)
             sequence.append(x)
 
+        predicted_dist = torch.stack(predicted_dist).transpose(1, 0)
         sequence = torch.stack(sequence).permute(1, 0)
         logits = torch.stack(logits).permute(1, 0)
         entropy = torch.stack(entropy).permute(1, 0)
@@ -344,7 +348,7 @@ class RnnSenderReinforce(nn.Module):
         logits = torch.cat([logits, zeros], dim=1)
         entropy = torch.cat([entropy, zeros], dim=1)
 
-        return sequence, logits, entropy
+        return sequence, logits, entropy , predicted_dist
 
 
 class RnnReceiverReinforce(nn.Module):
@@ -364,9 +368,9 @@ class RnnReceiverReinforce(nn.Module):
 
     def forward(self, message, input=None, aux_input=None, lengths=None):
         encoded = self.encoder(message, lengths)
-        sample, logits, entropy = self.agent(encoded, input, aux_input)
+        sample, logits, entropy, _ = self.agent(encoded, input, aux_input)
 
-        return sample, logits, entropy
+        return sample, logits, entropy, None
 
 
 class RnnReceiverDeterministic(nn.Module):
@@ -559,7 +563,7 @@ class CommunicationRnnReinforce(nn.Module):
         receiver_input=None,
         aux_input=None,
     ):
-        message, log_prob_s, entropy_s = sender(sender_input, aux_input)
+        message, log_prob_s, entropy_s, probas_s = sender(sender_input, aux_input)
         message_length = find_lengths(message)
         receiver_output, log_prob_r, entropy_r = receiver(
             message, receiver_input, aux_input, message_length
@@ -623,6 +627,7 @@ class CommunicationRnnReinforce(nn.Module):
             receiver_output=receiver_output.detach(),
             message_length=message_length,
             aux=aux_info,
+            # sender_probas=probas_s.detach()
         )
 
         return optimized_loss, interaction

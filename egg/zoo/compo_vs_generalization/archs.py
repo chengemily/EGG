@@ -72,5 +72,5 @@ class PlusOneWrapper(nn.Module):
         self.wrapped = wrapped
 
     def forward(self, *input):
-        r1, r2, r3 = self.wrapped(*input)
-        return r1 + 1, r2, r3
+        r1, r2, r3, r4 = self.wrapped(*input)
+        return r1 + 1, r2, r3, r4

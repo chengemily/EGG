@@ -82,7 +82,7 @@ def get_params(params):
     parser.add_argument(
         "--early_stopping_thr",
         type=float,
-        default=0.95,
+        default=0.99999,
         help="Early stopping threshold on accuracy (defautl: 0.99999)",
     )
     parser.add_argument(
@@ -206,12 +206,7 @@ class DiffLoss(torch.nn.Module):
         return loss, {"acc": acc, "acc_or": acc_or}
 
 
-def main(params, train_mode=True):
-    import copy
-
-    opts = get_params(params)
-    device = opts.device
-
+def load_data(opts):
     full_data = enumerate_attribute_value(opts.n_attributes, opts.n_values)
     if opts.density_data > 0:
         sampled_data = select_subset_V2(
@@ -242,6 +237,9 @@ def main(params, train_mode=True):
     train_loader = DataLoader(train, batch_size=opts.batch_size)
     validation_loader = DataLoader(validation, batch_size=len(validation))
 
+    return generalization_holdout_loader, uniform_holdout_loader, full_data_loader, train_loader, validation_loader, train, validation
+
+def define_agents(opts):
     n_dim = opts.n_attributes * opts.n_values
 
     if opts.receiver_cell in ["lstm", "rnn", "gru"]:
@@ -270,6 +268,20 @@ def main(params, train_mode=True):
         raise ValueError(f"Unknown sender cell, {opts.sender_cell}")
 
     sender = PlusOneWrapper(sender)
+    return sender, receiver
+
+
+def main(params, train_mode=True):
+    import copy
+
+    opts = get_params(params)
+    device = opts.device
+
+    generalization_holdout_loader, uniform_holdout_loader, full_data_loader, train_loader, validation_loader, \
+        train, validation = load_data(opts)
+
+    sender, receiver = define_agents(opts)
+
     loss = DiffLoss(opts.n_attributes, opts.n_values)
 
     baseline = {

@@ -1,6 +1,6 @@
 #!/bin/bash
 python -m egg.zoo.compo_vs_generalization.train \
-  --n_values=100 \
+  --n_values=10 \
   --n_attributes=2 \
   --vocab_size=100 \
   --max_len=3 \
@@ -14,5 +14,6 @@ python -m egg.zoo.compo_vs_generalization.train \
   --save=True \
   --checkpoint_dir=checkpoints/ \
   --checkpoint_freq=100 \
+  --early_stopping_thr=0.9 \
   --tensorboard
 
