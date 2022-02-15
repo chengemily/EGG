@@ -106,5 +106,8 @@ venv.bak/
 # mkdocs documentation
 /site
 
+# tensorboard runs
+runs/
+
 # mypy
 .mypy_cache/
