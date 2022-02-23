@@ -2,6 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import argparse
+import pickle
 
 
 def plot_hist(df, colname):
@@ -17,6 +18,15 @@ if __name__=='__main__':
 
     args = parser.parse_args()
 
-    compos = pd.read_csv(args.df_path)
-    for colname in compos.columns:
-        plot_hist(compos, colname)
+    # compos = pd.read_csv(args.df_path)
+
+    import os
+    all_checkpoints = []
+    for file in os.listdir('saved_models/'):
+        f = os.path.join('saved_models/', file)
+        with open(f, 'rb') as f_:
+            all_checkpoints.append(pickle.load(f_)['last_validation_compo_metrics'])
+
+    df = pd.DataFrame(all_checkpoints)
+    for colname in df.columns:
+        plot_hist(df, colname)

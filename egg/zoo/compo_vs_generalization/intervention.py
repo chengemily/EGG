@@ -170,20 +170,6 @@ class Metrics(core.Callback):
         )
         self.stats = output
 
-
-        # with open('./compo_logs.csv', 'a') as f_object:
-        #     # Pass the file object and a list
-        #     # of column names to DictWriter()
-        #     # You will get a object of DictWriter
-        #     dictwriter_object = DictWriter(f_object, fieldnames=list(output.keys()))
-        #
-        #     # Pass the dictionary as an argument to the Writerow()
-        #     dictwriter_object.writerow(output)
-        #     print(output)
-        #     print('wrote line')
-        #     # Close the file object
-        #     f_object.close()
-
         output_json = json.dumps(output)
         print(output_json, flush=True)
         game.train()
