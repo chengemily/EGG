@@ -34,6 +34,13 @@ try:
 except ImportError:
     pass
 
+def get_grad_norm(agent):
+    total_norm = 0
+    for p in agent.parameters():
+        param_norm = p.grad.data.norm(2)
+        total_norm += param_norm.item() ** 2
+    total_norm = total_norm ** (1. / 2)
+    return total_norm
 
 class Trainer:
     """
@@ -51,6 +58,7 @@ class Trainer:
         device: torch.device = None,
         callbacks: Optional[List[Callback]] = None,
         grad_norm: float = None,
+        convergence_epsilon: float = None,
         aggregate_interaction_logs: bool = True,
     ):
         """
@@ -72,11 +80,12 @@ class Trainer:
         common_opts = get_opts()
         self.validation_freq = common_opts.validation_freq
         self.device = common_opts.device if device is None else device
-
+        print('HERE')
         self.should_stop = False
         self.start_epoch = 0  # Can be overwritten by checkpoint loader
         self.callbacks = callbacks if callbacks else []
         self.grad_norm = grad_norm
+        self.convergence_epsilon = convergence_epsilon
         self.aggregate_interaction_logs = aggregate_interaction_logs
 
         self.update_freq = common_opts.update_freq
@@ -90,7 +99,7 @@ class Trainer:
         self.distributed_context = common_opts.distributed_context
         if self.distributed_context.is_distributed:
             print("# Distributed context: ", self.distributed_context)
-
+        print('HERE2')
         if self.distributed_context.is_leader and not any(
             isinstance(x, CheckpointSaver) for x in self.callbacks
         ):
@@ -126,8 +135,9 @@ class Trainer:
             self.callbacks = [
                 ConsoleLogger(print_train_loss=False, as_json=False),
             ]
-
+        print('HERE3')
         if self.distributed_context.is_distributed:
+            print('where r we here')
             device_id = self.distributed_context.local_rank
             torch.cuda.set_device(device_id)
             self.game.to(device_id)
@@ -151,37 +161,69 @@ class Trainer:
             self.optimizer.state = move_to(self.optimizer.state, device_id)
 
         else:
+            print('stuck?')
             self.game.to(self.device)
+            print('stuck2?')
             # NB: some optimizers pre-allocate buffers before actually doing any steps
             # since model is placed on GPU within Trainer, this leads to having optimizer's state and model parameters
             # on different devices. Here, we protect from that by moving optimizer's internal state to the proper device
             self.optimizer.state = move_to(self.optimizer.state, self.device)
-
+            print('stuck3?')
+        print('HERE4')
         if common_opts.fp16:
             self.scaler = GradScaler()
         else:
             self.scaler = None
 
-    def eval(self, data=None):
+        print('INIT DONE')
+
+    def eval(self, data=None, imitation=False):
         mean_loss = 0.0
         interactions = []
         n_batches = 0
         validation_data = self.validation_data if data is None else data
-        self.game.eval()
-        with torch.no_grad():
+
+        if not imitation:
+            self.game.eval()
+
+            with torch.no_grad():
+                for batch in validation_data:
+                    if not isinstance(batch, Batch):
+                        batch = Batch(*batch)
+                    batch = batch.to(self.device)
+                    optimized_loss, interaction = self.game(*batch)
+                    if (
+                        self.distributed_context.is_distributed
+                        and self.aggregate_interaction_logs
+                    ):
+                        interaction = Interaction.gather_distributed_interactions(
+                            interaction
+                        )
+                    interaction = interaction.to("cpu")
+                    mean_loss += optimized_loss
+
+                    for callback in self.callbacks:
+                        callback.on_batch_end(
+                            interaction, optimized_loss, n_batches, is_training=False
+                        )
+
+                    interactions.append(interaction)
+                    n_batches += 1
+        else:
+            self.game.train()
+
             for batch in validation_data:
                 if not isinstance(batch, Batch):
                     batch = Batch(*batch)
                 batch = batch.to(self.device)
                 optimized_loss, interaction = self.game(*batch)
                 if (
-                    self.distributed_context.is_distributed
-                    and self.aggregate_interaction_logs
+                        self.distributed_context.is_distributed
+                        and self.aggregate_interaction_logs
                 ):
                     interaction = Interaction.gather_distributed_interactions(
                         interaction
                     )
-                interaction = interaction.to("cpu")
                 mean_loss += optimized_loss
 
                 for callback in self.callbacks:
@@ -203,8 +245,6 @@ class Trainer:
         interactions = []
 
         self.game.train()
-
-        self.optimizer.zero_grad()
 
         for batch_id, batch in enumerate(self.train_data):
             if not isinstance(batch, Batch):
@@ -239,6 +279,9 @@ class Trainer:
                 else:
                     self.optimizer.step()
 
+                # self.last_grad_sender = get_grad_norm(self.game.sender)
+                # self.last_grad_receiver = get_grad_norm(self.game.receiver)
+
                 self.optimizer.zero_grad()
 
             n_batches += 1
@@ -265,13 +308,13 @@ class Trainer:
     def train(self, n_epochs):
         for callback in self.callbacks:
             callback.on_train_begin(self)
-
+        breakpoint()
         for epoch in range(self.start_epoch, n_epochs):
             for callback in self.callbacks:
                 callback.on_epoch_begin(epoch + 1)
 
             train_loss, train_interaction = self.train_epoch()
-
+            breakpoint()
             for callback in self.callbacks:
                 callback.on_epoch_end(train_loss, train_interaction, epoch + 1)
 
@@ -289,7 +332,6 @@ class Trainer:
                     callback.on_validation_end(
                         validation_loss, validation_interaction, epoch + 1
                     )
-
             if self.should_stop:
                 for callback in self.callbacks:
                     callback.on_early_stopping(

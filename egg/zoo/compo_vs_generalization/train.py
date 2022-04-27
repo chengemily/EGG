@@ -4,6 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import argparse
+import os
 import copy
 import json
 import pickle
@@ -34,8 +35,12 @@ from egg.zoo.compo_vs_generalization.intervention import Evaluator, Metrics
 
 def get_params(params):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_attributes", type=int, default=4, help="")
-    parser.add_argument("--n_values", type=int, default=4, help="")
+    parser.add_argument("--n_attributes",
+                        type=int,
+                        default=4, help="")
+    parser.add_argument("--n_values",
+                        type=int,
+                        default=4, help="")
     parser.add_argument("--data_scaler", type=int, default=100)
     parser.add_argument("--stats_freq", type=int, default=0)
     parser.add_argument(
@@ -44,19 +49,10 @@ def get_params(params):
     parser.add_argument(
         "--density_data", type=int, default=0, help="no sampling if equal 0"
     )
-
-    parser.add_argument(
-        "--sender_hidden",
-        type=int,
-        default=50,
-        help="Size of the hidden layer of Sender (default: 10)",
-    )
-    parser.add_argument(
-        "--receiver_hidden",
-        type=int,
-        default=50,
-        help="Size of the hidden layer of Receiver (default: 10)",
-    )
+    parser.add_argument('--hidden',
+                        type=int,
+                        default=50,
+                        help='Size of hidden layer of both agents')
 
     parser.add_argument(
         "--sender_entropy_coeff",
@@ -243,24 +239,24 @@ def define_agents(opts):
     n_dim = opts.n_attributes * opts.n_values
 
     if opts.receiver_cell in ["lstm", "rnn", "gru"]:
-        receiver = Receiver(n_hidden=opts.receiver_hidden, n_outputs=n_dim)
+        receiver = Receiver(n_hidden=opts.hidden, n_outputs=n_dim)
         receiver = core.RnnReceiverDeterministic(
             receiver,
             opts.vocab_size + 1,
             opts.receiver_emb,
-            opts.receiver_hidden,
+            opts.hidden,
             cell=opts.receiver_cell,
         )
     else:
         raise ValueError(f"Unknown receiver cell, {opts.receiver_cell}")
 
     if opts.sender_cell in ["lstm", "rnn", "gru"]:
-        sender = Sender(n_inputs=n_dim, n_hidden=opts.sender_hidden)
+        sender = Sender(n_inputs=n_dim, n_hidden=opts.hidden)
         sender = core.RnnSenderReinforce(
             agent=sender,
             vocab_size=opts.vocab_size,
             embed_dim=opts.sender_emb,
-            hidden_size=opts.sender_hidden,
+            hidden_size=opts.hidden,
             max_len=opts.max_len,
             cell=opts.sender_cell,
         )
@@ -327,7 +323,7 @@ def main(params, train_mode=True):
     )
 
     prefix = 'randomseed_{}'.format(
-        opts.random_seed, opts.n_attributes, opts.n_values, opts.max_len, opts.vocab_size)
+        opts.random_seed)
     holdout_evaluator = Evaluator(loaders, opts.device, freq=0)
     early_stopper = EarlyStopperAccuracy(opts.early_stopping_thr, validation=True)
     checkpoint_saver = core.CheckpointSaver(
@@ -370,8 +366,16 @@ def main(params, train_mode=True):
     print("---End--")
 
     if train_mode and opts.save and validation_acc.item() >= opts.early_stopping_thr:
+        folder_name = opts.checkpoint_dir.split('/')[1]
+        saved_models_path = '/home/echeng/EGG/saved_models/{}'.format(folder_name)
+
+        if not os.path.exists(saved_models_path):
+            os.makedirs(saved_models_path)
+
         # save model checkpoint (see trainers.py)
-        with open('/home/echeng/EGG/saved_models/big/checkpoint_wrapper_randomseed{}.pkl'.format(opts.random_seed),
+        with open('{}/checkpoint_wrapper_randomseed{}.pkl'.format(
+                saved_models_path,
+                opts.random_seed),
                   'wb') as f:
             pickle.dump({
                 'checkpoint_path': opts.checkpoint_dir + prefix + '_final.tar',
@@ -391,14 +395,62 @@ def main(params, train_mode=True):
 if __name__ == "__main__":
     import sys
     import multiprocessing as mp
+    
+    def get_args_for_string(argstring):
+        master_args = sys.argv.copy()[1:]
+        argstrings = list(filter(lambda elt: '--' in elt, master_args))
+        args = []
+        
+        next_idx = master_args.index(argstring) + 1
 
-    def launch_training(i):
-        args = sys.argv.copy()[1:]
-        args.append('--random_seed={}'.format(i))
+        while next_idx < len(master_args) and (master_args[next_idx] not in argstrings):
+            args.append(master_args[next_idx])
+            next_idx += 1
+
+        return args
+        
+
+    def launch_training(i, grid_dict):
+        master_args = sys.argv.copy()[1:]
+        args = []
+        argstrings = list(filter(lambda elt: '--' in elt, master_args))
+
+        for argstring in argstrings:
+            args.append(argstring)
+            if argstring in grid_dict: # assume argstring is '--something'
+                args.append(str(grid_dict[argstring]))
+            else:
+                next_idx = master_args.index(argstring) + 1
+
+                while next_idx < len(master_args) and (master_args[next_idx] not in argstrings):
+                    args.append(master_args[next_idx])
+                    next_idx += 1
+
+        args.append('--checkpoint_dir')
+        args.append('checkpoints/n_val_{}_n_att_{}_vocab_{}_max_len_{}_hidden_{}/'.format(
+            grid_dict['--n_values'], grid_dict['--n_attributes'], grid_dict['--vocab_size'], grid_dict['--max_len'],
+            grid_dict['--hidden']
+        ))
+        args.append('--random_seed')
+        args.append(str(i))
+
+        print(args)
+
         return main(args)
 
     pool = mp.Pool(mp.cpu_count())
-    results = [pool.apply(launch_training, args=(i,)) for i in range(4,30)]
+
+    results = [
+        pool.apply(launch_training, args=(i, {
+            '--n_values': n_val, '--n_attributes': n_att, '--vocab_size': vocab_size, '--max_len': max_len, '--hidden': hidden
+        }))
+        for i in range(50)
+        for n_val in get_args_for_string('--n_values')
+        for n_att in get_args_for_string('--n_attributes')
+        for vocab_size in get_args_for_string('--vocab_size')
+        for max_len in get_args_for_string('--max_len')
+        for hidden in get_args_for_string('--hidden')
+    ]
 
     pool.close()
 

@@ -30,16 +30,9 @@ class Loss:
         labels: torch.Tensor,
         aux_input: Dict[str, torch.Tensor],
     ) -> Tuple[torch.Tensor, Dict[str, Any]]:
-        batch_size = sender_input.size(0)
-        receiver_output = receiver_output.view(batch_size, self.rcvr_output_size)
-        labels = labels.view(batch_size, self.rcvr_output_size)
-
         acc = (
                 receiver_output.argmax(dim=-1) == labels.argmax(dim=-1)
             ).float()
-        print(acc.shape)
-        print('ACC: ', acc)
+
         loss = F.cross_entropy(receiver_output, labels.argmax(dim=-1), reduction='mean')
-        print('LOSS: ', loss)
-        input()
         return loss, {"acc": acc}

@@ -348,7 +348,7 @@ class RnnSenderReinforce(nn.Module):
         logits = torch.cat([logits, zeros], dim=1)
         entropy = torch.cat([entropy, zeros], dim=1)
 
-        return sequence, logits, entropy , predicted_dist
+        return sequence, logits, entropy, predicted_dist
 
 
 class RnnReceiverReinforce(nn.Module):
@@ -381,7 +381,7 @@ class RnnReceiverDeterministic(nn.Module):
     the agent becomes compatible with the SenderReceiverRnnReinforce game.
 
     As the wrapped agent does not sample, it has to be trained via regular back-propagation. This requires that both the
-    the agent's output and  loss function and the wrapped agent are differentiable.
+    the agent's output and loss function and the wrapped agent are differentiable.
 
     >>> class Agent(nn.Module):
     ...     def __init__(self):
@@ -623,11 +623,11 @@ class CommunicationRnnReinforce(nn.Module):
             labels=labels,
             receiver_input=receiver_input,
             aux_input=aux_input,
-            message=message.detach(),
+            message= message.detach(),
             receiver_output=receiver_output.detach(),
             message_length=message_length,
             aux=aux_info,
-            # sender_probas=probas_s.detach()
+            # sender_probas=probas_s#.detach()
         )
 
         return optimized_loss, interaction

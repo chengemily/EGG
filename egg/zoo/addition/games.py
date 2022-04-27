@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 
 import egg.core as core
-from egg.zoo.addition.archs import Game, Receiver, Sender
+from egg.zoo.addition.archs import Game, Receiver, Sender, PlusOneWrapper
 from egg.zoo.addition.losses import get_loss
 
 
@@ -33,6 +33,8 @@ def define_agents(opts):
         max_len=opts.max_len,
         cell=opts.sender_cell,
     )
+    sender = PlusOneWrapper(sender)
+
     return sender, receiver
 
 

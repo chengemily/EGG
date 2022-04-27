@@ -100,12 +100,12 @@ def _populate_cl_params(arg_parser: argparse.ArgumentParser) -> argparse.Argumen
         help="Number of symbols (terms) in the vocabulary (default: 10)",
     )
     arg_parser.add_argument(
-        "--max_len", type=int, default=1, help="Max length of the sequence (default: 1)"
+        "--max_len", type=int, default=1, help="Max length of the sequence (default: 1)",
     )
 
     # Setting up tensorboard
     arg_parser.add_argument(
-        "--tensorboard", default=False, help="enable tensorboard", action="store_true"
+        "--tensorboard", default=True, help="enable tensorboard", action="store_true"
     )
     arg_parser.add_argument(
         "--tensorboard_dir", type=str, default="runs/", help="Path for tensorboard log"
@@ -131,14 +131,12 @@ def _populate_cl_params(arg_parser: argparse.ArgumentParser) -> argparse.Argumen
 def _get_params(
     arg_parser: argparse.ArgumentParser, params: List[str]
 ) -> argparse.Namespace:
-    args = arg_parser.parse_args(params)
+    args, _ = arg_parser.parse_known_args(params)
     args.cuda = not args.no_cuda and torch.cuda.is_available()
     # just to avoid confusion and be consistent
     args.no_cuda = not args.cuda
     args.device = torch.device("cuda" if args.cuda else "cpu")
-    print('USING DEVICE:', args.device)
     args.distributed_context = maybe_init_distributed(args)
-
     if args.fp16 and torch.__version__ < "1.6.0":
         print("--fp16 is only supported with pytorch >= 1.6.0, please update!")
         args.fp16 = False

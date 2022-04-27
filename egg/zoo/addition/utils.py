@@ -23,7 +23,7 @@ def get_opts(params):
     )
     parser.add_argument(
         "--input_size",
-        default=2,
+        default=20,
         help="Input size N is numbers 0...N-1",
     )
     parser.add_argument(

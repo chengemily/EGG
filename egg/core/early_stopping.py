@@ -73,3 +73,30 @@ class EarlyStopperAccuracy(EarlyStopper):
         metric_mean = last_epoch_interactions.aux[self.field_name].mean()
 
         return metric_mean >= self.threshold
+
+
+class EarlyStopperConvergence(EarlyStopper):
+    """
+    Implements early stopping logic that stops training when a threshold on a metric
+    is achieved.
+    """
+
+    def __init__(
+        self, threshold: float, validation: bool = True
+    ) -> None:
+        """
+        :param threshold: early stopping threshold for the validation set accuracy
+            (assumes that the loss function returns the accuracy under name `field_name`)
+        :param field_name: the name of the metric return by loss function which should be evaluated against stopping
+            criterion (default: "acc")
+        :param validation: whether the statistics on the validation (or training, if False) data should be checked
+        """
+        super(EarlyStopperConvergence, self).__init__(validation)
+        self.threshold = threshold
+
+    def should_stop(self) -> bool:
+        return max(self.trainer.last_grad_receiver, self.trainer.last_grad_sender) < self.threshold
+
+
+
+
