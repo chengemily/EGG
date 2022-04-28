@@ -25,14 +25,10 @@ def main(params: List[str]) -> None:
         breakpoint()
 
     train_loader, val_loader, holdout_loader = get_dataloaders(opts)
-    print('Got dataloaders')
 
     game = build_game(opts)
-    print('built game')
     optimizer = build_optimizer_and_scheduler(game, opts.lr)
-    print('got optimizer')
     callbacks = get_callbacks(opts)
-    print('got callbacks')
     trainer = core.Trainer(
         game=game,
         optimizer=optimizer,
@@ -40,9 +36,10 @@ def main(params: List[str]) -> None:
         validation_data=val_loader,
         callbacks=callbacks,
     )
-    print('training')
     trainer.train(n_epochs=opts.n_epochs)
-
+    early_stopper = callbacks[1]
+    last_interaction = early_stopper.validation_stats[-1][1]
+    print(last_interaction)
     end = datetime.now() + timedelta(hours=6)  # Using CET timezone
 
     print(f"| FINISHED JOB at {end}. It took {end - begin}")

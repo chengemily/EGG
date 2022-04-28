@@ -21,6 +21,11 @@ class Loss:
         self.sender_input_size = input_size
         self.rcvr_output_size = input_size * 2 - 1
 
+        # Because classes are imbalanced, set class weights to be inversely
+        # proportional to class size, adding to 1. (This boosts rare classes)
+        self.ce_weights = torch.tensor([min(i + 1, self.rcvr_output_size - i) for i in range(self.rcvr_output_size)])
+        self.ce_weights = torch.sum(self.ce_weights) / self.ce_weights
+
     def __call__(
         self,
         sender_input: torch.Tensor,
@@ -30,9 +35,9 @@ class Loss:
         labels: torch.Tensor,
         aux_input: Dict[str, torch.Tensor],
     ) -> Tuple[torch.Tensor, Dict[str, Any]]:
+
         acc = (
                 receiver_output.argmax(dim=-1) == labels.argmax(dim=-1)
-            ).float()
-
-        loss = F.cross_entropy(receiver_output, labels.argmax(dim=-1), reduction='mean')
+            ).detach().float()
+        loss = F.cross_entropy(receiver_output, labels.argmax(dim=-1), weight=self.ce_weights)
         return loss, {"acc": acc}

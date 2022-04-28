@@ -584,6 +584,7 @@ class CommunicationRnnReinforce(nn.Module):
             not_eosed = (i < message_length).float()
             effective_entropy_s += entropy_s[:, i] * not_eosed
             effective_log_prob_s += log_prob_s[:, i] * not_eosed
+
         effective_entropy_s = effective_entropy_s / message_length.float()
 
         weighted_entropy = (

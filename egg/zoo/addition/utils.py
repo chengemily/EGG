@@ -24,6 +24,7 @@ def get_opts(params):
     parser.add_argument(
         "--input_size",
         default=20,
+        type=int,
         help="Input size N is numbers 0...N-1",
     )
     parser.add_argument(
@@ -54,7 +55,7 @@ def get_opts(params):
     parser.add_argument(
         "--early_stopping_thr",
         type=float,
-        default=0.99999,
+        default=0.9,
         help="Early stopping threshold on accuracy (defautl: 0.99999)",
     )
     parser.add_argument(
@@ -73,14 +74,20 @@ def get_opts(params):
     parser.add_argument(
         "--sender_entropy_coeff",
         type=float,
-        default=0,
+        default=0.05,
         help="Entropy regularisation coeff for Sender (default: 1e-2)",
     )
     parser.add_argument(
         "--training_density",
         type=float,
-        default=0.7,
+        default=1.0,
         help="Proportion of full dataset that is the training set",
+    )
+    parser.add_argument(
+        "--data_scaler",
+        type=float,
+        default=100,
+        help="Creates effective N x the size of the dataset",
     )
 
     # get_other_opts(parser)

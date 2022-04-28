@@ -8,6 +8,19 @@ from typing import Iterable, Optional, Tuple
 import torch
 from torch.utils.data import DataLoader
 
+class ScaledDataset:
+    def __init__(self, examples, scaling_factor=1):
+        self.examples = examples
+        self.scaling_factor = scaling_factor
+
+    def __len__(self):
+        return len(self.examples) * self.scaling_factor
+
+    def __getitem__(self, k):
+        k = k % len(self.examples)
+        return self.examples[k]
+
+
 def get_dataloaders(opts) -> Tuple[Iterable[
     Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]
 ], Iterable[
@@ -20,10 +33,15 @@ def get_dataloaders(opts) -> Tuple[Iterable[
                                                            [len_train, len(full_data) - len_train]
                                                            )
     validation_set = train_set
-    train_loader, validation_loader, holdout_loader = DataLoader(train_set, batch_size=opts.batch_size, shuffle=False), \
+
+    train_set = ScaledDataset(train_set, opts.data_scaler)
+
+    train_loader, validation_loader, holdout_loader = DataLoader(train_set, batch_size=opts.batch_size, shuffle=True), \
                                              DataLoader(validation_set, batch_size=len(validation_set)), \
                                              DataLoader(holdout_set, batch_size=opts.batch_size)
+
     return train_loader, validation_loader, holdout_loader
+
 
 def enumerate_dataset(input_size):
     data = []
@@ -33,7 +51,7 @@ def enumerate_dataset(input_size):
         for j in range(input_size):
             inp = torch.zeros(2 * input_size)
             inp[i] = 1.0
-            inp[j] = 1.0
+            inp[input_size + j] = 1.0
 
             label = torch.zeros(2 * input_size - 1)
             label[i + j] = 1.0

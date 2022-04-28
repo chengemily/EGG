@@ -38,16 +38,6 @@ class Receiver(nn.Module):
         return self.fc(x)
 
 
-class PlusOneWrapper(nn.Module):
-    def __init__(self, wrapped):
-        super().__init__()
-        self.wrapped = wrapped
-
-    def forward(self, *input):
-        r1, r2, r3, r4 = self.wrapped(*input)
-        return r1 + 1, r2, r3, r4
-
-
 class Game(nn.Module):
     def __init__(
         self,
