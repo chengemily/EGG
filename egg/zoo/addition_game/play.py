@@ -144,7 +144,6 @@ def main(params):
     interaction_saver = core.InteractionSaver(
             train_epochs=[1] + list(range(opts.validation_freq, opts.n_epochs, opts.validation_freq)),
             test_epochs=[1] + list(range(opts.validation_freq, opts.n_epochs, opts.validation_freq)),
-            # checkpoint_dir='./additions_interactions/full_{}/rs_{}/'.format(opts.vocab_size, opts.random_seed)
             checkpoint_dir='./additions_interactions/N_{}_gen_density_{}/rs_{}/'.format(
                 opts.input_size, opts.training_density, opts.random_seed)
         )
@@ -152,8 +151,6 @@ def main(params):
         interaction_saver,
         core.ConsoleLogger(print_train_loss=True, as_json=True),
         core.CheckpointSaver(
-            # checkpoint_path='./additions_checkpoints/full_{}/rs_{}/'.format(opts.vocab_size,
-            #                                                                        opts.random_seed),
             checkpoint_path='./additions_checkpoints/N_{}_gen_density_{}/rs_{}/'.format(opts.input_size,
                                                                                         opts.training_density,
                                                                                                     opts.random_seed),
