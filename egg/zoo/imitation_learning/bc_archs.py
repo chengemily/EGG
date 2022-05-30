@@ -3,12 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from egg.zoo.compo_vs_generalization.archs import *
-from egg.core.reinforce_wrappers import *
 
+
+def bc_agents_setup(opts, device, new_sender, new_receiver):
+    return RnnSenderBC(new_sender, opts, device), RnnReceiverBC(new_receiver, opts, device)
 
 class RnnReceiverBC(nn.Module):
     def __init__(
-            self, agent:RnnReceiverDeterministic, opts, device
+            self, agent, opts, device
     ):
         super(RnnReceiverBC, self).__init__()
         self.agent = agent
@@ -26,7 +28,7 @@ class RnnReceiverBC(nn.Module):
 
         return receiver_output, log_prob_r, entropy_r, batch_size
 
-    def score(self, interaction, val=False, expert=None, expert_eval=False):
+    def score(self, interaction, val=False, expert=None, imitation=False):
         """
         Returns cross-entropy loss between the output of the BC receiver and the output
         of the expert receiver.
@@ -55,7 +57,9 @@ class RnnReceiverBC(nn.Module):
             # CE loss: https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html on class probabilities.
             r_loss = F.cross_entropy(receiver_output.transpose(1, 2), interaction.receiver_output)
         else:
-            expert_output, log_prob_e, entropy_e = expert(interaction.message)
+            expert_output, _, _ = expert(interaction.message.to(self.device))
+            if not imitation:
+                expert_output = expert_output.detach()
             expert_output = expert_output.view(
                 batch_size, self.opts.n_attributes, self.opts.n_values
             )
@@ -85,7 +89,7 @@ class RnnSenderBC(nn.Module):
         return sender_output, log_prob_s, entropy_s, class_proba_s, batch_size
 
 
-    def score(self, interaction, val=False, expert=None, expert_eval=False):
+    def score(self, interaction, val=False, expert=None, imitation=False):
         """
         Returns cross-entropy loss between the output of the BC sender and the output
         of the expert sender given the same input.
@@ -113,8 +117,9 @@ class RnnSenderBC(nn.Module):
         if expert is None: # regular BC
             s_loss = F.cross_entropy(class_proba_s, msg, reduction='mean')
         else: # imitation pressure
-            expert_output, log_prob_e, entropy_e, class_probas_e = expert(interaction.sender_input)
-
+            _, _, _, class_probas_e = expert(interaction.sender_input.to(self.device))
+            if not imitation:
+                class_probas_e = class_probas_e.detach()
             s_loss = F.cross_entropy(class_proba_s.view(batch_size, self.opts.max_len, self.opts.vocab_size).transpose(1,2),
                                      class_probas_e.transpose(1,2).softmax(dim=1))
 

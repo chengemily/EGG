@@ -34,16 +34,6 @@ try:
 except ImportError:
     pass
 
-def get_grad_norm(agent):
-    total_norm = 0
-    for name, p in agent.named_parameters():
-        print('param: ', name)
-        print('p weight: ', p)
-        print('p grad: ', p.grad)
-        param_norm = p.grad.data.norm(2)
-        total_norm += param_norm.item() ** 2
-    total_norm = total_norm ** (1. / 2)
-    return total_norm
 
 class Trainer:
     """
@@ -170,53 +160,28 @@ class Trainer:
         else:
             self.scaler = None
 
-    def eval(self, data=None, imitation=False):
+    def eval(self, data=None):
         mean_loss = 0.0
         interactions = []
         n_batches = 0
         validation_data = self.validation_data if data is None else data
 
-        if not imitation:
-            self.game.eval()
+        self.game.eval()
 
-            with torch.no_grad():
-                for batch in validation_data:
-                    if not isinstance(batch, Batch):
-                        batch = Batch(*batch)
-                    batch = batch.to(self.device)
-                    optimized_loss, interaction = self.game(*batch)
-                    if (
-                        self.distributed_context.is_distributed
-                        and self.aggregate_interaction_logs
-                    ):
-                        interaction = Interaction.gather_distributed_interactions(
-                            interaction
-                        )
-                    interaction = interaction.to("cpu")
-                    mean_loss += optimized_loss
-
-                    for callback in self.callbacks:
-                        callback.on_batch_end(
-                            interaction, optimized_loss, n_batches, is_training=False
-                        )
-
-                    interactions.append(interaction)
-                    n_batches += 1
-        else:
-            self.game.train()
-
+        with torch.no_grad():
             for batch in validation_data:
                 if not isinstance(batch, Batch):
                     batch = Batch(*batch)
                 batch = batch.to(self.device)
                 optimized_loss, interaction = self.game(*batch)
                 if (
-                        self.distributed_context.is_distributed
-                        and self.aggregate_interaction_logs
+                    self.distributed_context.is_distributed
+                    and self.aggregate_interaction_logs
                 ):
                     interaction = Interaction.gather_distributed_interactions(
                         interaction
                     )
+                interaction = interaction.to("cpu")
                 mean_loss += optimized_loss
 
                 for callback in self.callbacks:
@@ -272,8 +237,8 @@ class Trainer:
                 else:
                     self.optimizer.step()
 
-                self.last_grad_sender = get_grad_norm(self.game.sender)
-                self.last_grad_receiver = get_grad_norm(self.game.receiver)
+                # self.last_grad_sender = get_grad_norm(self.game.sender)
+                # self.last_grad_receiver = get_grad_norm(self.game.receiver)
 
                 self.optimizer.zero_grad()
 
@@ -308,7 +273,6 @@ class Trainer:
             train_loss, train_interaction = self.train_epoch()
             for callback in self.callbacks:
                 callback.on_epoch_end(train_loss, train_interaction, epoch + 1)
-
             validation_loss = validation_interaction = None
             if (
                 self.validation_data is not None

@@ -289,6 +289,7 @@ class InteractionSaver(Callback):
 
         if checkpoint_dir:
             self.checkpoint_dir = pathlib.Path(checkpoint_dir) / "interactions"
+            print('CHECKPOINT DIR: ', self.checkpoint_dir)
         else:
             self.checkpoint_dir = pathlib.Path("./interactions")
 

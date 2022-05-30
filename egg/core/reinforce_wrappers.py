@@ -628,7 +628,6 @@ class CommunicationRnnReinforce(nn.Module):
             receiver_output=receiver_output.detach(),
             message_length=message_length,
             aux=aux_info,
-            # sender_probas=probas_s#.detach()
         )
 
         return optimized_loss, interaction

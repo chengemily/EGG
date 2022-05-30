@@ -30,6 +30,7 @@ from egg.zoo.compo_vs_generalization import train as compo_vs_generalization
 from egg.zoo.imitation_learning.loader import *
 from egg.zoo.imitation_learning.util import *
 
+
 def eval_expert(metadata_path: str):
     checkpoint_wrapper = load_metadata_from_pkl(metadata_path)
     params = checkpoint_wrapper['params']
@@ -84,21 +85,32 @@ def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, traine
                             s_loss.item(), r_acc.item(), s_acc.item(), mean_loss,
                             acc.item(), acc_or.item(), sender_converged_epoch, receiver_converged_epoch)
 
-        if imitation:
-            trainer.game.train()
+        _, interaction = trainer.eval(trainer.train_data)
 
-        _, interaction = trainer.eval(trainer.train_data, imitation=imitation)
+        trainer.game.train()
 
         if not new_receiver_converged:
             new_receiver.train()
-            r_loss, r_acc = train_epoch(optimizer_r, new_receiver, interaction, expert=trainer.game.receiver if imitation else None)
+            r_loss, r_acc = train_epoch(
+                optimizer_r,
+                new_receiver,
+                interaction,
+                expert=trainer.game.receiver,
+                imitation=imitation
+            )
             cumu_r_loss += r_loss
             cumu_r_acc.append(r_acc)
             new_receiver_converged = get_grad_norm(new_receiver) < bc_args.convergence_epsilon
             receiver_converged_epoch = t
         if not new_sender_converged:
             new_sender.train()
-            s_loss, s_acc = train_epoch(optimizer_s, new_sender, interaction, expert=trainer.game.sender if imitation else None)
+            s_loss, s_acc = train_epoch(
+                optimizer_s,
+                new_sender,
+                interaction,
+                expert=trainer.game.sender,
+                imitation=imitation
+            )
             cumu_s_loss += s_loss
             cumu_s_acc.append(s_acc)
             new_sender_converged = get_grad_norm(new_sender) < bc_args.convergence_epsilon
@@ -111,6 +123,13 @@ def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, traine
 
     return cumu_s_loss, cumu_r_loss, t, s_acc, r_acc, cumu_s_acc, cumu_r_acc
 
+
+def train_epoch(optimizer, agent, interaction, expert=None, imitation=False):
+    optimizer.zero_grad()
+    loss, acc = agent.score(interaction, expert=expert, imitation=imitation)
+    loss.backward()
+    optimizer.step()
+    return loss, acc
 
 
 def main(metadata_path: str, bc_params, expert_seed):
@@ -175,12 +194,7 @@ def main(metadata_path: str, bc_params, expert_seed):
     core.close()
 
 
-def train_epoch(optimizer, agent, interaction, expert=None):
-    optimizer.zero_grad()
-    loss, acc = agent.score(interaction, expert=expert)
-    loss.backward()
-    optimizer.step()
-    return loss, acc
+
 
 
 if __name__=='__main__':
