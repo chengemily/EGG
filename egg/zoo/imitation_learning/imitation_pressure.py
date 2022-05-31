@@ -42,6 +42,7 @@ from egg.zoo.imitation_learning.loss import DiffLoss
 def imit_params(params):
     parser = argparse.ArgumentParser()
     parser.add_argument('--loss', type=str, choices=['kl', 'cross_entropy'], default='cross entropy')
+    parser.add_argument('--sender_rcvr_imitation_reinforce_weight', type=float, default=0.0)
     parser.add_argument('--kick', type=str, choices=['none', 'imitation', 'random'], default='none')
     parser.add_argument('--turn_taking', type=str, choices=['fixed', 'convergence'], default='fixed')
     parser.add_argument('--n_turns', type=int, default=50)
@@ -293,7 +294,7 @@ if __name__ == "__main__":
             '--n_values': n_val, '--n_attributes': n_att, '--vocab_size': vocab_size, '--max_len': max_len,
             '--hidden': hidden, '--n_epochs': n_epochs
         }))
-        for i in range(30)
+        for i in range(9, 30)
         for n_val in get_args_for_string('--n_values')
         for n_att in get_args_for_string('--n_attributes')
         for vocab_size in get_args_for_string('--vocab_size')

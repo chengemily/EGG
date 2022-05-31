@@ -35,7 +35,6 @@ def get_interaction_paths(args) -> Dict:
 
 def convert_to_acc_df(all_interactions, acc_thres=0.75):
     """
-    TODO: Change to get compositionality metrics.
     :param all_interactions:
     :param acc_thres:
     :return:
@@ -85,7 +84,7 @@ def plot_means(ylabel, savepath, ploty, plotx, agged_data_list, legend_labels, x
 
 
 def plot(ylabel, ploty, plotx, xlabel='Epoch', agged_data=None, sep_data=None, epochs=None, savepath=None, label='mean',
-         error_range=2, agg_mean_style='k--'):
+         error_range=1, agg_mean_style='k--'):
 
     if agged_data is not None:
         x, y, err = agged_data[plotx], agged_data[ploty, 'mean'], agged_data[ploty, 'std']
@@ -136,6 +135,7 @@ def load_time_series_from_experiment(experiment_path, acc_thres=0.75, filter=Fal
 def load_all_time_series(args) -> Tuple[Dict[str, list]]:
     agged_datas = {}
     sep_datas = {}
+    n = {}
     for experiment, run_paths in get_interaction_paths(args).items():
         agged_datas[experiment] = []
         sep_datas[experiment] = []
@@ -144,21 +144,20 @@ def load_all_time_series(args) -> Tuple[Dict[str, list]]:
             agged_data, sep_data, num_seeds = load_time_series_from_experiment(
                 run_path, acc_thres=args.acc_thrs, filter=args.filter
             )
-            print('Number of seeds for {}: {}'.format(experiment, num_seeds))
-
+            n[experiment] = num_seeds
             agged_datas[experiment].append(agged_data)
             sep_datas[experiment].append(sep_data)
 
-    return agged_datas, sep_datas
+    return agged_datas, sep_datas, n
 
 
 def plot_composite(args: argparse.Namespace) -> None:
     # load all interactions
-    agged_datas, sep_datas = load_all_time_series(args)
+    agged_datas, sep_datas, n = load_all_time_series(args)
     agged_data_trains = [agged_datas[experiment] for experiment in args.experiment]
     agged_data_trains = [run['train'] for run_list in agged_data_trains for run in run_list]
 
-    labels = args.experiment
+    labels = [experiment + ' (n={})'.format(n[experiment]) for experiment in args.experiment]
 
     print(agged_data_trains[0].columns)
     for metric in ['context_independence', 'positional_disent', 'bag_of_symbol_disent', 'topographic_sim']:

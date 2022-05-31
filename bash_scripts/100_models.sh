@@ -12,7 +12,6 @@ python -m egg.zoo.compo_vs_generalization.train \
   --n_epochs=3000 \
   --save=True \
   --checkpoint_dir=checkpoints/ \
-  --checkpoint_freq=300 \
   --early_stopping_thr=0.9 
   #--tensorboard
 

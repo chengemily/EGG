@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 import egg.core as core
+from egg.core.util import find_lengths
 from egg.core import EarlyStopperAccuracy
 from egg.core import CheckpointSaver
 from egg.zoo.compo_vs_generalization.archs import (
@@ -40,8 +41,8 @@ def eval_expert(metadata_path: str):
 
 def eval_bc_prediction(new_sender, new_receiver, trainer, t=None, checkpoint_path=None):
     _, interaction = trainer.eval()
-    r_loss, r_acc = new_receiver.score(interaction, val=True)
-    s_loss, s_acc = new_sender.score(interaction, val=True)
+    r_loss, r_acc, _ = new_receiver.score(interaction, val=True)
+    s_loss, s_acc, _ = new_sender.score(interaction, val=True)
     print('Epoch: {}; Receiver val loss: {}; Sender val loss: {}'.format(t, r_loss, s_loss))
 
     return r_loss, s_loss, r_acc, s_acc
@@ -65,12 +66,13 @@ def eval_bc_original_task(new_trainer, t=None, checkpoint_path=None):
 
 
 def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, trainer,
-             new_trainer=None, imitation=False, perf_log=None):
+             new_trainer=None, imitation=False, perf_log=None, sender_aware_weight=0.0):
     new_receiver_converged = False
     new_sender_converged = False
     receiver_converged_epoch, sender_converged_epoch = 0, 0
-    cumu_r_loss, cumu_s_loss = 0, 0
-    cumu_r_acc, cumu_s_acc = [], []
+    cumu_r_loss, cumu_s_loss = torch.zeros(bc_args.n_epochs_bc), torch.zeros(bc_args.n_epochs_bc)
+    cumu_r_acc, cumu_s_acc = torch.empty(bc_args.n_epochs_bc), torch.empty(bc_args.n_epochs_bc)
+    reinforce_loss_for_sender = torch.zeros(bc_args.n_epochs_bc)
 
     for t in range(bc_args.n_epochs_bc):
         val = t % bc_args.val_interval == 0
@@ -91,28 +93,31 @@ def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, traine
 
         if not new_receiver_converged:
             new_receiver.train()
-            r_loss, r_acc = train_epoch(
+            r_loss, r_acc, aux_info = train_epoch(
                 optimizer_r,
                 new_receiver,
                 interaction,
                 expert=trainer.game.receiver,
-                imitation=imitation
+                imitation=imitation,
+                aux_info={'expert_sender': train.game.sender if sender_aware_weight > 0 else None,
+                        'sender_aware': sender_aware_weight > 0}
             )
-            cumu_r_loss += r_loss
-            cumu_r_acc.append(r_acc)
+            reinforce_loss_for_sender[t] = aux_info['reinforce_loss']
+            cumu_r_loss[t] = r_loss
+            cumu_r_acc[t] = r_acc
             new_receiver_converged = get_grad_norm(new_receiver) < bc_args.convergence_epsilon
             receiver_converged_epoch = t
         if not new_sender_converged:
             new_sender.train()
-            s_loss, s_acc = train_epoch(
+            s_loss, s_acc, _ = train_epoch(
                 optimizer_s,
                 new_sender,
                 interaction,
                 expert=trainer.game.sender,
                 imitation=imitation
             )
-            cumu_s_loss += s_loss
-            cumu_s_acc.append(s_acc)
+            cumu_s_loss[t] = s_loss
+            cumu_s_acc[t] = s_acc
             new_sender_converged = get_grad_norm(new_sender) < bc_args.convergence_epsilon
             sender_converged_epoch = t
 
@@ -121,15 +126,18 @@ def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, traine
             break
         print('Epoch: {}; Receiver loss: {}; Sender loss: {}; R acc: {}; S acc: {}'.format(t, r_loss, s_loss, r_acc, s_acc))
 
+    cumu_s_loss += sender_aware_weight * reinforce_loss_for_sender
+    cumu_s_loss = cumu_s_loss.sum()
+    cumu_r_loss = cumu_r_loss.sum()
     return cumu_s_loss, cumu_r_loss, t, s_acc, r_acc, cumu_s_acc, cumu_r_acc
 
 
-def train_epoch(optimizer, agent, interaction, expert=None, imitation=False):
+def train_epoch(optimizer, agent, interaction, expert=None, imitation=False, aux_info={}):
     optimizer.zero_grad()
-    loss, acc = agent.score(interaction, expert=expert, imitation=imitation)
+    loss, acc, aux = agent.score(interaction, expert=expert, imitation=imitation, aux_info=aux_info)
     loss.backward()
     optimizer.step()
-    return loss, acc
+    return loss, acc, aux
 
 
 def main(metadata_path: str, bc_params, expert_seed):

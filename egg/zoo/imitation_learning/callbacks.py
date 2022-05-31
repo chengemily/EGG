@@ -307,11 +307,14 @@ class HoldoutEvaluator(core.Callback):
         
 
 class BehaviouralCloning(core.Callback):
-    def __init__(self, opts, bc_opts, optimizer, kick: str, freq: int=0):
+    def __init__(self, opts, bc_opts, optimizer, kick: str, freq: int=0, sender_rcvr_imitation_reinforce_weight: float=0.0):
         self.expert_optimizer = optimizer
         self.bc_opts = bc_opts
         self.opts = opts
         self.device = opts.device
+        # whether a REINFORCE loss from receiver imitation should kick back to speaker
+        self.sender_rcvr_imitation_reinforce_weight = sender_rcvr_imitation_reinforce_weight
+
         self.kick = kick # imitation, none, or fixed
         self.epoch = 0
         self.freq = freq
@@ -331,8 +334,10 @@ class BehaviouralCloning(core.Callback):
             bc_speaker, bc_receiver,
             bc_optimizer_s, bc_optimizer_r,
             self.trainer,
-            imitation=(self.kick == 'imitation')
+            imitation=(self.kick == 'imitation'),
+            sender_aware_weight=self.sender_rcvr_imitation_reinforce_weight
         )
+
         results = dict(
             epoch=self.epoch,
             bc_s_loss=s_loss.item(),
@@ -376,7 +381,8 @@ class BehaviouralCloningConvergence(EarlyStopper):
     """
 
     def __init__(
-        self, opts, bc_opts, optimizer, kick: str, threshold: float, field_name: str = "acc", validation: bool = False
+        self, opts, bc_opts, optimizer, kick: str, threshold: float, field_name: str = "acc", validation: bool = False,
+            sender_rcvr_imitation_reinforce_weight: float=0.0
     ) -> None:
         """
         :param threshold: early stopping threshold for the validation set accuracy
@@ -393,6 +399,7 @@ class BehaviouralCloningConvergence(EarlyStopper):
         self.expert_optimizer = optimizer
         self.threshold = threshold
         self.field_name = field_name
+        self.sender_rcvr_imitation_reinforce_weight = sender_rcvr_imitation_reinforce_weight
 
     def train_bc(self, logs):
         bc_speaker, bc_receiver = bc_agents_setup(self.opts, self.device, *define_agents(self.opts))
@@ -408,8 +415,10 @@ class BehaviouralCloningConvergence(EarlyStopper):
             bc_speaker, bc_receiver,
             bc_optimizer_s, bc_optimizer_r,
             self.trainer,
-            imitation=(self.kick == 'imitation')
+            imitation=(self.kick == 'imitation'),
+            sender_aware_weight=self.sender_rcvr_imitation_reinforce_weight
         )
+
         results = dict(
             epoch=self.epoch,
             bc_s_loss=s_loss.item(),
