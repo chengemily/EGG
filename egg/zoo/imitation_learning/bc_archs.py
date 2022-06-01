@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from egg.zoo.compo_vs_generalization.archs import *
+from egg.zoo.imitation_learning.archs import *
 
 
 def bc_agents_setup(opts, device, new_sender, new_receiver):
@@ -20,7 +20,7 @@ class RnnReceiverBC(nn.Module):
         self.to(device)
 
     def forward(self, message):
-        message = message.cuda()
+        message.to(device)
         receiver_output, log_prob_r, entropy_r = self.agent(message)
         batch_size = receiver_output.shape[0]
         receiver_output = receiver_output.view(
@@ -106,7 +106,7 @@ class RnnSenderBC(nn.Module):
         self.to(device)
 
     def forward(self, sender_input):
-        sender_input = sender_input.cuda()
+        sender_input.to(device)
         sender_output, log_prob_s, entropy_s, class_proba_s = self.agent(sender_input)
         batch_size = sender_output.shape[0]
         class_proba_s = class_proba_s.reshape(
@@ -114,7 +114,6 @@ class RnnSenderBC(nn.Module):
         )
 
         return sender_output, log_prob_s, entropy_s, class_proba_s, batch_size
-
 
     def score(self, interaction, val=False, expert=None, imitation=False, aux_info={}):
         """

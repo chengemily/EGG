@@ -294,7 +294,7 @@ if __name__ == "__main__":
             '--n_values': n_val, '--n_attributes': n_att, '--vocab_size': vocab_size, '--max_len': max_len,
             '--hidden': hidden, '--n_epochs': n_epochs
         }))
-        for i in range(9, 30)
+        for i in range(7, 12)
         for n_val in get_args_for_string('--n_values')
         for n_att in get_args_for_string('--n_attributes')
         for vocab_size in get_args_for_string('--vocab_size')

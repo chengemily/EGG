@@ -10,13 +10,12 @@ import egg.core as core
 from egg.core.util import find_lengths
 from egg.core import EarlyStopperAccuracy
 from egg.core import CheckpointSaver
-from egg.zoo.compo_vs_generalization.archs import (
-    Freezer,
-    NonLinearReceiver,
+from egg.zoo.imitation_learning.archs import (
     PlusOneWrapper,
     Receiver,
     Sender,
 )
+from egg.zoo.compo_vs_generalization import train as compo_vs_generalization
 from egg.zoo.compo_vs_generalization.data import (
     ScaledDataset,
     enumerate_attribute_value,
@@ -26,8 +25,6 @@ from egg.zoo.compo_vs_generalization.data import (
     split_holdout,
     split_train_test,
 )
-from egg.zoo.compo_vs_generalization.intervention import Evaluator, Metrics
-from egg.zoo.compo_vs_generalization import train as compo_vs_generalization
 from egg.zoo.imitation_learning.loader import *
 from egg.zoo.imitation_learning.util import *
 

@@ -18,7 +18,7 @@ from egg.zoo.compo_vs_generalization.data import (
     split_holdout,
     split_train_test,
 )
-from egg.zoo.compo_vs_generalization.intervention import Evaluator, Metrics
+from egg.zoo.imitation_learning.callbacks import HoldoutEvaluator, CompoEvaluator
 from egg.zoo.imitation_learning.bc_archs import *
 from egg.zoo.imitation_learning.loss import DiffLoss
 
@@ -222,7 +222,7 @@ def expert_setup(opts):
     )
     optimizer = torch.optim.Adam(game.parameters(), lr=opts.lr)
 
-    metrics_evaluator = Metrics(
+    metrics_evaluator = CompoEvaluator(
         validation.examples,
         opts.device,
         opts.n_attributes,
@@ -247,7 +247,7 @@ def expert_setup(opts):
         )
     )
 
-    holdout_evaluator = Evaluator(loaders, opts.device, freq=0)
+    holdout_evaluator = HoldoutEvaluator(loaders, opts.device, freq=0)
 
     callbacks = [
         core.ConsoleLogger(as_json=True, print_train_loss=False),

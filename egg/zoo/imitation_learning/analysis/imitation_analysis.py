@@ -161,17 +161,23 @@ def plot_composite(args: argparse.Namespace) -> None:
 
     print(agged_data_trains[0].columns)
     for metric in ['context_independence', 'positional_disent', 'bag_of_symbol_disent', 'topographic_sim']:
-        plot_means(metric, 'images/training_{}_n_epochs_{}_composite.png'.format(metric, args.n_epochs[0]),
+        plot_means(metric, 'images/training_{}_n_epochs_{}_composite_{}.png'.format(
+            metric, args.n_epochs[0], '_'.join(args.experiment)
+        ),
                    'compo_metrics/{}'.format(metric), 'epoch', agged_data_trains, labels)
 
-    # for metric in ['generalization hold out/', 'uniform holdout/', '']:
-    for metric in ['']:
+    for metric in ['generalization hold out/', 'uniform holdout/', '']:
+    # for metric in ['']:
         name = metric.split(' ')[0] if len(metric) else metric
         plot_means(metric, 'images/{}_acc_n_epochs_{}_composite.png'.format(name, args.n_epochs[0]),
                    '{}acc'.format(metric), 'epoch', agged_data_trains, labels)
-    plot_means('sender entropy', 'images/training_n_epochs_sender_entropy_composite.png',
+    plot_means('sender entropy', 'images/training_n_epochs_{}_sender_entropy_composite_{}.png'.format(
+        args.n_epochs[0], '_'.join(args.experiment)
+    ),
                'sender_entropy', 'epoch', agged_data_trains, labels)
-    plot_means('imitation/sample_complexity', 'images/training_n_epochs_sample_complexity_composite.png',
+    plot_means('imitation/sample_complexity', 'images/training_n_epochs_{}_sample_complexity_composite_{}.png'.format(
+        args.n_epochs[0], '_'.join(args.experiment)
+    ),
                'imitation/sample_complexity', 'epoch', agged_data_trains, labels)
 
 
@@ -228,6 +234,7 @@ def data_analysis_suite(args):
     percent_runs_improved(sep_data_control, sep_data_experimental)
     means_statistical_test(sep_data_control, sep_data_experimental)
     variances_statistical_test(sep_data_control, sep_data_experimental)
+
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description='Process runs from imitation experiment.')
