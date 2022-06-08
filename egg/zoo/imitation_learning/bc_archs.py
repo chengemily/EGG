@@ -20,7 +20,7 @@ class RnnReceiverBC(nn.Module):
         self.to(device)
 
     def forward(self, message):
-        message.to(device)
+        message = message.to(self.device)
         receiver_output, log_prob_r, entropy_r = self.agent(message)
         batch_size = receiver_output.shape[0]
         receiver_output = receiver_output.view(
@@ -58,8 +58,14 @@ class RnnReceiverBC(nn.Module):
         imitation_reinforce_for_sender = 0
 
         if expert is None:
-            # CE loss: https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html on class probabilities.
-            r_loss = F.cross_entropy(receiver_output.transpose(1, 2), interaction.receiver_output)
+            if self.opts.loss == 'cross_entropy':
+                # CE loss: https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html on class probabilities.
+                r_loss = F.cross_entropy(receiver_output.transpose(1, 2), interaction.receiver_output)
+            elif self.opts.loss == 'kl':
+                # TODO: transform to log probs.
+                print(receiver_output)
+                input()
+                r_loss = F.kl_div(receiver_output.transpose(1, 2), interaction.receiver_output)
         else:
             if sender_aware:
                 expert_sender = aux_info['expert_sender']
@@ -75,7 +81,11 @@ class RnnReceiverBC(nn.Module):
             expert_output = expert_output.view(
                 batch_size, self.opts.n_attributes, self.opts.n_values
             )
-            r_loss = F.cross_entropy(receiver_output.transpose(1,2),
+            if self.opts.loss == 'cross_entropy':
+                r_loss = F.cross_entropy(receiver_output.transpose(1,2),
+                                     expert_output.transpose(1,2).softmax(dim=1), reduction='none')
+            elif self.opts.loss == 'kl':
+                r_loss = F.kl_div(receiver_output.transpose(1,2),
                                      expert_output.transpose(1,2).softmax(dim=1), reduction='none')
 
             # Calculate reinforce loss for sender if applicable.
@@ -106,7 +116,7 @@ class RnnSenderBC(nn.Module):
         self.to(device)
 
     def forward(self, sender_input):
-        sender_input.to(device)
+        sender_input = sender_input.to(self.device)
         sender_output, log_prob_s, entropy_s, class_proba_s = self.agent(sender_input)
         batch_size = sender_output.shape[0]
         class_proba_s = class_proba_s.reshape(
@@ -141,13 +151,22 @@ class RnnSenderBC(nn.Module):
         ) - 1 # reset to 0 - 99; in PlusOneWrapper they add one.
 
         if expert is None: # regular BC
-            s_loss = F.cross_entropy(class_proba_s, msg, reduction='mean')
+            if self.opts.loss == 'cross_entropy':
+                s_loss = F.cross_entropy(class_proba_s, msg, reduction='mean')
+            elif self.opts.loss == 'kl':
+                s_loss = F.kl_div(class_proba_s, msg, reduction='mean')
         else: # imitation pressure
             _, _, _, class_probas_e = expert(interaction.sender_input.to(self.device))
             if not imitation:
                 class_probas_e = class_probas_e.detach()
-            s_loss = F.cross_entropy(class_proba_s.view(batch_size, self.opts.max_len, self.opts.vocab_size).transpose(1,2),
+
+            if self.opts.loss == 'cross_entropy':
+                s_loss = F.cross_entropy(class_proba_s.view(batch_size, self.opts.max_len, self.opts.vocab_size).transpose(1,2),
                                      class_probas_e.transpose(1,2).softmax(dim=1))
+            elif self.opts.loss == 'kl':
+                s_loss = F.kl_div(
+                    class_proba_s.view(batch_size, self.opts.max_len, self.opts.vocab_size).transpose(1, 2),
+                    class_probas_e.transpose(1, 2).softmax(dim=1))
 
         accuracy = torch.eq(sender_output[:, :self.opts.max_len], interaction.message).sum() / torch.numel(interaction.message)
 

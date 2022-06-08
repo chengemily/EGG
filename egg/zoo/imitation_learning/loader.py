@@ -18,7 +18,7 @@ from egg.zoo.compo_vs_generalization.data import (
     split_holdout,
     split_train_test,
 )
-from egg.zoo.imitation_learning.callbacks import HoldoutEvaluator, CompoEvaluator
+from egg.zoo.imitation_learning.callbacks import *
 from egg.zoo.imitation_learning.bc_archs import *
 from egg.zoo.imitation_learning.loss import DiffLoss
 
@@ -247,7 +247,7 @@ def expert_setup(opts):
         )
     )
 
-    holdout_evaluator = HoldoutEvaluator(loaders, opts.device, freq=0)
+    holdout_evaluator = HoldoutEvaluator(loaders, opts.device)
 
     callbacks = [
         core.ConsoleLogger(as_json=True, print_train_loss=False),
@@ -270,7 +270,7 @@ def expert_setup(opts):
 def get_bc_params(params):
     parser = argparse.ArgumentParser()
     parser.add_argument("--n_epochs_bc", type=int, default=100, help="Number of epochs for BC training")
-    parser.add_argument('--loss', type=str, choices=['kl', 'cross entropy'], default='cross entropy')
+    parser.add_argument('--loss', type=str, choices=['kl', 'cross_entropy'], default='cross_entropy')
     parser.add_argument(
         "--early_stopping_thr_bc",
         type=float,
