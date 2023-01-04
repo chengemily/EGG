@@ -4,27 +4,18 @@ import torch.nn.functional as F
 
 import egg.core as core
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 def define_agents(opts):
     n_dim = opts.n_attributes * opts.n_values
 
     if opts.receiver_cell in ["lstm", "rnn", "gru"]:
         receiver = Receiver(n_hidden=opts.hidden, n_outputs=n_dim)
-<<<<<<< HEAD
         receiver = core.RnnReceiverReinforceDeterministic(
-=======
-        receiver = core.RnnReceiverDeterministic(
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             receiver,
             opts.vocab_size + 1,
             opts.receiver_emb,
             opts.hidden,
             cell=opts.receiver_cell,
         )
-<<<<<<< HEAD
     elif opts.receiver_cell == 'transformer':
         receiver = Receiver(n_hidden=opts.hidden, n_outputs=n_dim)
         receiver = core.TransformerReceiverDeterministic(
@@ -36,8 +27,6 @@ def define_agents(opts):
             opts.hidden,
             10
         )
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     else:
         raise ValueError(f"Unknown receiver cell, {opts.receiver_cell}")
 
@@ -51,7 +40,6 @@ def define_agents(opts):
             max_len=opts.max_len,
             cell=opts.sender_cell,
         )
-<<<<<<< HEAD
     elif opts.sender_cell == 'transformer':
         sender = Sender(n_inputs=n_dim, n_hidden=opts.hidden)
         sender = core.TransformerSenderReinforce(
@@ -65,8 +53,6 @@ def define_agents(opts):
             generate_style="standard",
             causal=True,
         )
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     else:
         raise ValueError(f"Unknown sender cell, {opts.sender_cell}")
 
@@ -101,7 +87,3 @@ class PlusOneWrapper(nn.Module):
     def forward(self, *input):
         r1, r2, r3, r4 = self.wrapped(*input)
         return r1 + 1, r2, r3, r4
-<<<<<<< HEAD
-=======
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0

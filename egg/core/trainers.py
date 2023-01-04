@@ -4,10 +4,7 @@
 # LICENSE file in the root directory of this source tree.
 
 import os
-<<<<<<< HEAD
 import time
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 import pathlib
 from typing import List, Optional
 
@@ -39,7 +36,6 @@ except ImportError:
     pass
 
 
-<<<<<<< HEAD
 def get_grad_norm(agent):
     with torch.no_grad():
         total_norm = 0
@@ -50,8 +46,6 @@ def get_grad_norm(agent):
         return total_norm
 
 
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 class Trainer:
     """
     Implements the training logic. Some common configuration (checkpointing frequency, path, validation frequency)
@@ -185,7 +179,6 @@ class Trainer:
 
         self.game.eval()
 
-<<<<<<< HEAD
         # with torch.no_grad():
         for batch in validation_data:
             if not isinstance(batch, Batch):
@@ -218,36 +211,8 @@ class Trainer:
         mean_loss /= n_batches
         full_interaction = Interaction.from_iterable(interactions)
         # print('done with eval')
-=======
-        with torch.no_grad():
-            for batch in validation_data:
-                if not isinstance(batch, Batch):
-                    batch = Batch(*batch)
-                batch = batch.to(self.device)
-                optimized_loss, interaction = self.game(*batch)
-                if (
-                    self.distributed_context.is_distributed
-                    and self.aggregate_interaction_logs
-                ):
-                    interaction = Interaction.gather_distributed_interactions(
-                        interaction
-                    )
-                interaction = interaction.to("cpu")
-                mean_loss += optimized_loss
-
-                for callback in self.callbacks:
-                    callback.on_batch_end(
-                        interaction, optimized_loss, n_batches, is_training=False
-                    )
-
-                interactions.append(interaction)
-                n_batches += 1
-
-        mean_loss /= n_batches
-        full_interaction = Interaction.from_iterable(interactions)
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
-        return mean_loss.item(), full_interaction
+        
+	return mean_loss.item(), full_interaction
 
     def train_epoch(self):
         mean_loss = 0
@@ -255,11 +220,7 @@ class Trainer:
         interactions = []
 
         self.game.train()
-<<<<<<< HEAD
         self.last_grad_receiver, self.last_grad_sender = 0.0, 0.0
-=======
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         for batch_id, batch in enumerate(self.train_data):
             if not isinstance(batch, Batch):
                 batch = Batch(*batch)
@@ -267,14 +228,9 @@ class Trainer:
 
             context = autocast() if self.scaler else nullcontext()
             with context:
-<<<<<<< HEAD
                 t = time.perf_counter()
                 optimized_loss, interaction = self.game(*batch)
-                # print('train forward pass: ', time.perf_counter() - t)
-=======
-                optimized_loss, interaction = self.game(*batch)
 
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
                 if self.update_freq > 1:
                     # throughout EGG, we minimize _mean_ loss, not sum
                     # hence, we need to account for that when aggregating grads
@@ -283,10 +239,6 @@ class Trainer:
             if self.scaler:
                 self.scaler.scale(optimized_loss).backward()
             else:
-<<<<<<< HEAD
-                # print('right before backwards on overall loss')
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
                 optimized_loss.backward()
 
             if batch_id % self.update_freq == self.update_freq - 1:
@@ -303,31 +255,22 @@ class Trainer:
                 else:
                     self.optimizer.step()
 
-<<<<<<< HEAD
                 # self.last_grad_sender += get_grad_norm(self.game.module.sender) if self.distributed_context.is_distributed \
                 #     else get_grad_norm(self.game.sender)
                 # self.last_grad_receiver += get_grad_norm(self.game.module.receiver) if self.distributed_context.is_distributed \
                 #     else get_grad_norm(self.game.receiver)
-=======
-                # self.last_grad_sender = get_grad_norm(self.game.sender)
-                # self.last_grad_receiver = get_grad_norm(self.game.receiver)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
                 self.optimizer.zero_grad()
 
             n_batches += 1
             mean_loss += optimized_loss.detach()
-<<<<<<< HEAD
-
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
-            if (
+            
+	    if (
                 self.distributed_context.is_distributed
                 and self.aggregate_interaction_logs
             ):
                 interaction = Interaction.gather_distributed_interactions(interaction)
             interaction = interaction.to("cpu")
-<<<<<<< HEAD
             # print('to cpu: ', time.perf_counter() - t)
             # t = time.perf_counter()
             for callback in self.callbacks:
@@ -339,13 +282,7 @@ class Trainer:
         self.last_grad_receiver /= n_batches
 
         # print('Max grad norm: ', max(self.last_grad_sender, self.last_grad_receiver))
-=======
 
-            for callback in self.callbacks:
-                callback.on_batch_end(interaction, optimized_loss, batch_id)
-
-            interactions.append(interaction)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
         if self.optimizer_scheduler:
             self.optimizer_scheduler.step()
@@ -357,7 +294,6 @@ class Trainer:
     def train(self, n_epochs):
         for callback in self.callbacks:
             callback.on_train_begin(self)
-<<<<<<< HEAD
 
         for epoch in range(self.start_epoch, n_epochs):
             if hasattr(self.game.__class__, 'init_pairings') and callable(
@@ -380,15 +316,8 @@ class Trainer:
                 t = time.perf_counter()
                 callback.on_epoch_end(train_loss, train_interaction, epoch + 1)
                 # print('callback on epoch end: ', time.perf_counter() - t)
-=======
-        for epoch in range(self.start_epoch, n_epochs):
-            for callback in self.callbacks:
-                callback.on_epoch_begin(epoch + 1)
-
-            train_loss, train_interaction = self.train_epoch()
-            for callback in self.callbacks:
-                callback.on_epoch_end(train_loss, train_interaction, epoch + 1)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
+            
+	    
             validation_loss = validation_interaction = None
             if (
                 self.validation_data is not None
@@ -396,7 +325,6 @@ class Trainer:
                 and (epoch + 1) % self.validation_freq == 0
             ):
                 for callback in self.callbacks:
-<<<<<<< HEAD
                     t = time.perf_counter()
                     callback.on_validation_begin(epoch + 1)
                     # print('callback val begin: ', time.perf_counter() - t)
@@ -411,15 +339,6 @@ class Trainer:
                         validation_loss, validation_interaction, epoch + 1
                     )
                     # print('callback val end: ', time.perf_counter() - t)
-=======
-                    callback.on_validation_begin(epoch + 1)
-                validation_loss, validation_interaction = self.eval()
-
-                for callback in self.callbacks:
-                    callback.on_validation_end(
-                        validation_loss, validation_interaction, epoch + 1
-                    )
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             if self.should_stop:
                 for callback in self.callbacks:
                     callback.on_early_stopping(

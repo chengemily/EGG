@@ -13,27 +13,19 @@ from egg.zoo.compo_vs_generalization.data import (
     ScaledDataset,
     enumerate_attribute_value,
     one_hotify,
-<<<<<<< HEAD
-=======
     select_subset_V1,
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     select_subset_V2,
     split_holdout,
     split_train_test,
 )
-<<<<<<< HEAD
 from egg.zoo.imitation_learning.callbacks import CompoEvaluator, HoldoutEvaluator
 from egg.zoo.imitation_learning.bc_archs import *
 from egg.zoo.imitation_learning.loss import DiffLoss
 import egg.zoo.compo_vs_generalization.train as compo_vs_generalization
-=======
 from egg.zoo.imitation_learning.callbacks import *
 from egg.zoo.imitation_learning.bc_archs import *
-from egg.zoo.imitation_learning.loss import DiffLoss
 
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
-import torch
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -45,36 +37,24 @@ def load_interaction(file):
     return x
 
 
-<<<<<<< HEAD
 def load_all_interactions(rootdir: str, mode: str = 'train', last_only: bool=False) -> Tuple[Sequence, Sequence]:
     """
     Loads all interactions and epoch list such that they are ordered ascending by random seed.
     if "last" then only loads the last epoch.
-=======
-def load_all_interactions(rootdir: str, mode: str = 'train') -> Tuple[Sequence, Sequence]:
-    """
-    Loads all interactions and epoch list such that they are ordered ascending by random seed.
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     """
     p = Path(rootdir)
     random_seeds = [f for f in p.iterdir() if f.is_dir()]
     random_seeds = sorted(random_seeds, key = lambda p: int(str(p).split('_')[-1]))
     dir_for_mode = [str(rs) + '/interactions/{}'.format(mode) for rs in random_seeds]
-<<<<<<< HEAD
-=======
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
+    
     all_interactions = []
     global_epoch_list = []
     for rs in dir_for_mode:
         p = Path(rs)
         epochs = [str(f) for f in p.iterdir() if f.is_dir()]
         epochs = sorted(epochs, key=lambda x: int(x.split('_')[-1]))
-<<<<<<< HEAD
         if last_only: epochs = [epochs[-1]]
 
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         all_interactions.append([load_interaction(epoch + '/interaction_gpu0') for epoch in epochs])
 
         this_rs_epoch_list = [int(str(epoch).split('_')[-1]) for epoch in epochs]
@@ -132,16 +112,8 @@ def interaction_to_df(interaction: Dict) -> pd.DataFrame:
 
 
 def load_bc_checkpoints(from_rs=0, to_rs=101):
-<<<<<<< HEAD
     with open('/ccc/scratch/cont003/gen13547/chengemi/EGG/bc_checkpoints/bc_randomseed_{}_from_randomseed_{}_metadata.pkl'.format(to_rs, from_rs), 'rb') as f:
         x = pickle.load(f)
-=======
-    with open('/home/echeng/EGG/bc_checkpoints/bc_randomseed_{}_from_randomseed_{}_metadata.pkl'.format(to_rs, from_rs), 'rb') as f:
-        x = pickle.load(f)
-
-    # y = torch.load(x['checkpoint'])
-    # https://pytorch.org/tutorials/beginner/saving_loading_models.html
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     return x
 
 
@@ -159,11 +131,7 @@ def log_performance(perf_log, r_loss, s_loss, r_acc, s_acc, mean_loss, acc, acc_
 
 
 def save_behavioral_clones(bc_args, params, new_receiver, new_sender, optimizer_r, optimizer_s, metadata_path, metrics, expert_seed):
-<<<<<<< HEAD
     file_prefix = '/ccc/scratch/cont003/gen13547/chengemi/EGG/bc_checkpoints/bc_randomseed_{}_from_randomseed_{}'.format(
-=======
-    file_prefix = '/home/echeng/EGG/bc_checkpoints/bc_randomseed_{}_from_randomseed_{}'.format(
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         bc_args.bc_random_seed, expert_seed)
 
     torch.save({
@@ -233,15 +201,9 @@ def resave_compo_metrics_on_whole_dataset(metadata_path: str):
 
 def expert_setup(opts):
     generalization_holdout_loader, uniform_holdout_loader, full_data_loader, train_loader, validation_loader, \
-<<<<<<< HEAD
     train, validation = compo_vs_generalization.load_data(opts)
 
     sender, receiver = compo_vs_generalization.define_agents(opts)
-=======
-    train, validation = load_data(opts)
-
-    sender, receiver = define_agents(opts)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     loss = DiffLoss(opts.n_attributes, opts.n_values)
 
@@ -262,25 +224,19 @@ def expert_setup(opts):
     )
     optimizer = torch.optim.Adam(game.parameters(), lr=opts.lr)
 
-<<<<<<< HEAD
     random_state = np.random.RandomState(seed=1)
     validation_permuted = random_state.permutation(len(validation.examples))
     metrics_evaluator = CompoEvaluator(
         [validation.examples[i] for i in validation_permuted[:100]],
-=======
     metrics_evaluator = CompoEvaluator(
         validation.examples,
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         opts.device,
         opts.n_attributes,
         opts.n_values,
         opts.vocab_size + 1,
-<<<<<<< HEAD
         opts.distributed_context.is_distributed,
         is_population=False,
-=======
         freq=opts.stats_freq,
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     )
 
     loaders = []
@@ -299,14 +255,10 @@ def expert_setup(opts):
         )
     )
 
-<<<<<<< HEAD
     holdout_evaluator = HoldoutEvaluator(loaders,
                                          opts.device,
                                          opts.distributed_context.is_distributed,
                                          is_population=False)
-=======
-    holdout_evaluator = HoldoutEvaluator(loaders, opts.device)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     callbacks = [
         core.ConsoleLogger(as_json=True, print_train_loss=False),
@@ -328,31 +280,20 @@ def expert_setup(opts):
 
 def get_bc_params(params):
     parser = argparse.ArgumentParser()
-<<<<<<< HEAD
     parser.add_argument("--n_epochs_bc", type=int, default=300, help="Number of epochs for BC training")
-=======
     parser.add_argument("--n_epochs_bc", type=int, default=100, help="Number of epochs for BC training")
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     parser.add_argument('--loss', type=str, choices=['kl', 'cross_entropy'], default='cross_entropy')
     parser.add_argument(
         "--early_stopping_thr_bc",
         type=float,
-<<<<<<< HEAD
-        default=0.99,
-=======
         default=0.99999,
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         help="Early stopping threshold on accuracy (defautl: 0.99999)",
     )
     parser.add_argument(
         "--convergence_epsilon",
         type=float,
-<<<<<<< HEAD
-        # default=1e-2, # prev: 1e-2 for small setting; prev: 1e-4 for bc experiments.
         default=0.0,
-=======
         default=1e-2, # prev: 1e-4 for bc experiments.
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         help="Stop training when gradient norm is less than epsilon."
     )
     parser.add_argument(
@@ -370,7 +311,6 @@ def get_bc_params(params):
     parser.add_argument(
         "--bc_random_seed",
         type=int,
-<<<<<<< HEAD
         default=0
     )
     parser.add_argument(
@@ -390,9 +330,7 @@ def get_bc_params(params):
         default='cross_entropy',
         choices=['cross_entropy', 'accuracy'],
         help='Choice of sender reward, either (-) cross entropy or accuracy.'
-=======
         default=101
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     )
 
     args = core.init(arg_parser=parser, params=params)

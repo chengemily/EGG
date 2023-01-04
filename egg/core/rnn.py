@@ -49,10 +49,6 @@ class RnnEncoder(nn.Module):
             hidden_size=n_hidden,
             num_layers=num_layers,
         )
-<<<<<<< HEAD
-=======
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         self.embedding = nn.Embedding(vocab_size, embed_dim)
 
     def forward(

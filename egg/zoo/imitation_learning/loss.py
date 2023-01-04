@@ -29,14 +29,13 @@ class DiffLoss(torch.nn.Module):
 
             for attr in range(self.n_attributes):
                 zero_index = torch.nonzero(sender_input[:, attr, 0]).squeeze()
-<<<<<<< HEAD
-                if not len(zero_index.shape): continue
+                
+		if not len(zero_index.shape): continue
                 masked_size = zero_index.size(0)
                 if not masked_size: continue
-=======
                 masked_size = zero_index.size(0)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
-                masked_input = torch.index_select(sender_input, 0, zero_index)
+                
+		masked_input = torch.index_select(sender_input, 0, zero_index)
                 masked_output = torch.index_select(receiver_output, 0, zero_index)
 
                 no_attribute_input = torch.cat(
@@ -63,12 +62,8 @@ class DiffLoss(torch.nn.Module):
                     .mean()
                 )
                 acc += attr_acc
-<<<<<<< HEAD
-=======
-
-                #
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
-                attr_acc_or = (
+                
+		attr_acc_or = (
                     # average score on an attribute (averaged across all attributes and objects in the batch)
                     (
                         no_attribute_output.argmax(dim=-1)
@@ -89,12 +84,6 @@ class DiffLoss(torch.nn.Module):
 
             acc /= self.n_attributes
             acc_or /= self.n_attributes
-<<<<<<< HEAD
-            acc = torch.Tensor([acc])
-            acc_or = torch.Tensor([acc_or])
-            loss = torch.Tensor([loss])
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         else:
             acc = (
                 # whether the listener got all the attributes right in one vector (about an object), batch_size x 1

@@ -8,16 +8,10 @@ import os
 import copy
 import json
 import pickle
-<<<<<<< HEAD
 from random import sample
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
-=======
-import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
 import egg.core as core
 from egg.core import EarlyStopperAccuracy
@@ -54,11 +48,7 @@ def get_params(params):
         "--baseline", type=str, choices=["no", "mean", "builtin"], default="mean"
     )
     parser.add_argument(
-<<<<<<< HEAD
         "--holdout_density", type=float, default=1, help="no sampling if equal 1"
-=======
-        "--density_data", type=int, default=0, help="no sampling if equal 0"
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     )
     parser.add_argument('--hidden',
                         type=int,
@@ -130,7 +120,6 @@ class DiffLoss(torch.nn.Module):
 
             for attr in range(self.n_attributes):
                 zero_index = torch.nonzero(sender_input[:, attr, 0]).squeeze()
-<<<<<<< HEAD
 
                 try:
                     if not len(zero_index): continue
@@ -138,9 +127,6 @@ class DiffLoss(torch.nn.Module):
                     if not zero_index.item(): continue
                 masked_size = zero_index.size(0)
 
-=======
-                masked_size = zero_index.size(0)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
                 masked_input = torch.index_select(sender_input, 0, zero_index)
                 masked_output = torch.index_select(receiver_output, 0, zero_index)
 
@@ -179,10 +165,6 @@ class DiffLoss(torch.nn.Module):
                     .float()
                     .mean()
                 )
-<<<<<<< HEAD
-
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
                 acc_or += attr_acc_or
                 labels = no_attribute_input.argmax(dim=-1).view(
                     masked_size * n_attributes
@@ -229,40 +211,22 @@ class DiffLoss(torch.nn.Module):
 
 def load_data(opts):
     full_data = enumerate_attribute_value(opts.n_attributes, opts.n_values)
-<<<<<<< HEAD
     train, generalization_holdout = split_holdout(full_data)
     train, uniform_holdout = split_train_test(train, opts.holdout_density)
-=======
-    if opts.density_data > 0:
-        sampled_data = select_subset_V2(
-            full_data, opts.density_data, opts.n_attributes, opts.n_values
-        )
-        full_data = copy.deepcopy(sampled_data)
-
-    train, generalization_holdout = split_holdout(full_data)
-    train, uniform_holdout = split_train_test(train, 0.1)
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     generalization_holdout, train, uniform_holdout, full_data = [
         one_hotify(x, opts.n_attributes, opts.n_values)
         for x in [generalization_holdout, train, uniform_holdout, full_data]
     ]
 
-<<<<<<< HEAD
     train, validation = ScaledDataset(train), ScaledDataset(train)
     print('training dataset size: ', len(train))
     print('holdout size: ', len(generalization_holdout))
     print('uniform size: ', len(uniform_holdout))
-=======
-    train, validation = ScaledDataset(train, opts.data_scaler), ScaledDataset(train, 1)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
-
     generalization_holdout, uniform_holdout, full_data = (
         ScaledDataset(generalization_holdout),
         ScaledDataset(uniform_holdout),
         ScaledDataset(full_data),
     )
-<<<<<<< HEAD
     generalization_holdout_loader, uniform_holdout_loader, full_data_loader, train_loader, validation_loader = [
         DataLoader(x, batch_size=opts.batch_size)
         for x in [generalization_holdout, uniform_holdout, full_data, train, validation]
@@ -271,17 +235,6 @@ def load_data(opts):
     # validation_loader = DataLoader(validation, batch_size=opts.batch_size)
     return generalization_holdout_loader, uniform_holdout_loader, full_data_loader, train_loader, validation_loader, train, validation
 
-=======
-    generalization_holdout_loader, uniform_holdout_loader, full_data_loader = [
-        DataLoader(x, batch_size=opts.batch_size)
-        for x in [generalization_holdout, uniform_holdout, full_data]
-    ]
-
-    train_loader = DataLoader(train, batch_size=opts.batch_size)
-    validation_loader = DataLoader(validation, batch_size=len(validation))
-
-    return generalization_holdout_loader, uniform_holdout_loader, full_data_loader, train_loader, validation_loader, train, validation
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
 def define_agents(opts):
     n_dim = opts.n_attributes * opts.n_values
@@ -319,10 +272,7 @@ def main(params, train_mode=True):
     import copy
 
     opts = get_params(params)
-<<<<<<< HEAD
-=======
     device = opts.device
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     generalization_holdout_loader, uniform_holdout_loader, full_data_loader, train_loader, validation_loader, \
         train, validation = load_data(opts)
@@ -349,11 +299,7 @@ def main(params, train_mode=True):
     optimizer = torch.optim.Adam(game.parameters(), lr=opts.lr)
 
     metrics_evaluator = Metrics(
-<<<<<<< HEAD
         sample(validation.examples, min(100, len(validation.examples))),
-=======
-        validation.examples,
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         opts.device,
         opts.n_attributes,
         opts.n_values,
@@ -387,13 +333,8 @@ def main(params, train_mode=True):
     callbacks = [
         core.ConsoleLogger(as_json=True, print_train_loss=False),
         early_stopper,
-<<<<<<< HEAD
         holdout_evaluator,
         metrics_evaluator,
-=======
-        metrics_evaluator,
-        holdout_evaluator,
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         checkpoint_saver
     ]
 
@@ -409,10 +350,6 @@ def main(params, train_mode=True):
 
     if train_mode:
         trainer.train(n_epochs=opts.n_epochs)
-<<<<<<< HEAD
-        print('done training')
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         last_interaction = early_stopper.validation_stats[-1][1]
         uniformtest_acc = holdout_evaluator.results["uniform holdout"]["acc"]
         uniformtest_acc_or = holdout_evaluator.results["uniform holdout"]["acc_or"]
@@ -429,14 +366,8 @@ def main(params, train_mode=True):
 
     print("---End--")
 
-<<<<<<< HEAD
     if train_mode and opts.save:# and validation_acc.item() >= opts.early_stopping_thr:
         saved_models_path = opts.checkpoint_dir + '/saved_models/'
-=======
-    if train_mode and opts.save and validation_acc.item() >= opts.early_stopping_thr:
-        folder_name = opts.checkpoint_dir.split('/')[1]
-        saved_models_path = '/home/echeng/EGG/saved_models/{}'.format(folder_name)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
         if not os.path.exists(saved_models_path):
             os.makedirs(saved_models_path)
@@ -487,7 +418,6 @@ if __name__ == "__main__":
         for argstring in argstrings:
             args.append(argstring)
             if argstring in grid_dict: # assume argstring is '--something'
-<<<<<<< HEAD
                 if argstring == '--checkpoint_dir':
                     args.append(str(grid_dict[argstring]) + 'n_val_{}_n_att_{}_vocab_{}_max_len_{}_hidden_{}/'.format(
                         grid_dict['--n_values'], grid_dict['--n_attributes'], grid_dict['--vocab_size'],
@@ -496,9 +426,6 @@ if __name__ == "__main__":
                     ))
                 else:
                     args.append(str(grid_dict[argstring]))
-=======
-                args.append(str(grid_dict[argstring]))
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             else:
                 next_idx = master_args.index(argstring) + 1
 
@@ -506,43 +433,15 @@ if __name__ == "__main__":
                     args.append(master_args[next_idx])
                     next_idx += 1
 
-<<<<<<< HEAD
-        # args.append('--checkpoint_dir')
-        # args.append('n_val_{}_n_att_{}_vocab_{}_max_len_{}_hidden_{}/'.format(
-        #     grid_dict['--n_values'], grid_dict['--n_attributes'], grid_dict['--vocab_size'], grid_dict['--max_len'],
-        #     grid_dict['--hidden']
-        # ))
-        # args.append('--random_seed')
-        # args.append(str(i))
-=======
-        args.append('--checkpoint_dir')
-        args.append('checkpoints/n_val_{}_n_att_{}_vocab_{}_max_len_{}_hidden_{}/'.format(
-            grid_dict['--n_values'], grid_dict['--n_attributes'], grid_dict['--vocab_size'], grid_dict['--max_len'],
-            grid_dict['--hidden']
-        ))
-        args.append('--random_seed')
-        args.append(str(i))
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
-
         print(args)
 
         return main(args)
 
-<<<<<<< HEAD
     results = [
         launch_training(i, {
             '--n_values': n_val, '--n_attributes': n_att, '--vocab_size': vocab_size, '--max_len': max_len, '--hidden': hidden
         })
         for i in get_args_for_string('--random_seed')
-=======
-    pool = mp.Pool(mp.cpu_count())
-
-    results = [
-        pool.apply(launch_training, args=(i, {
-            '--n_values': n_val, '--n_attributes': n_att, '--vocab_size': vocab_size, '--max_len': max_len, '--hidden': hidden
-        }))
-        for i in range(50)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         for n_val in get_args_for_string('--n_values')
         for n_att in get_args_for_string('--n_attributes')
         for vocab_size in get_args_for_string('--vocab_size')
@@ -550,9 +449,4 @@ if __name__ == "__main__":
         for hidden in get_args_for_string('--hidden')
     ]
 
-<<<<<<< HEAD
-=======
     pool.close()
-
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0

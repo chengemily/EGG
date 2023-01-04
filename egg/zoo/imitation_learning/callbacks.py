@@ -5,14 +5,9 @@
 
 
 import json
-<<<<<<< HEAD
 import time
 from csv import DictWriter
 from typing import Dict, Iterable
-=======
-from csv import DictWriter
-from typing import Dict
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 from collections import defaultdict
 
 import torch
@@ -21,13 +16,13 @@ from scipy.stats import spearmanr
 
 import egg.core as core
 from egg.core.batch import Batch
-<<<<<<< HEAD
+
 from egg.core import Callback, Interaction, InteractionSaver
 from egg.core.early_stopping import EarlyStopper
 from egg.core.language_analysis import TopographicSimilarity, Disent
 
 from egg.zoo.imitation_learning.bc_trainer import BCTrainer
-from egg.zoo.imitation_learning.bc_archs import bc_agents_setup
+from egg.zoo.imitation_learning.behavioural_cloning import bc_agents_setup, train_bc
 from egg.zoo.imitation_learning.archs import define_agents
 from egg.zoo.imitation_learning.util import entropy, mutual_info
 # from egg.zoo.imitation_learning.mixed_game import MultitaskGame
@@ -47,22 +42,6 @@ def editdistance(s1, s2):
                 distances_.append(1 + min((distances[i1], distances[i1 + 1], distances_[-1])))
         distances = distances_
     return distances[-1]
-=======
-from egg.zoo.language_bottleneck.intervention import entropy, mutual_info
-from egg.core import Callback, Interaction
-from egg.core.early_stopping import EarlyStopper
-
-from egg.zoo.imitation_learning.behavioural_cloning import bc_agents_setup, train_bc
-from egg.zoo.imitation_learning.archs import define_agents
-
-try:
-    import editdistance  # package to install https://pypi.org/project/editdistance/0.3.1/
-except ImportError:
-    print(
-        "Please install editdistance package: `pip install editdistance`. "
-        "It is used for calculating topographic similarity."
-    )
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
 
 def ask_sender(n_attributes, n_values, dataset, sender, device):
@@ -89,7 +68,10 @@ def ask_sender(n_attributes, n_values, dataset, sender, device):
 
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 def information_gap_representation(meanings, representations):
     gaps = torch.zeros(representations.size(1))
     non_constant_positions = 0.0
@@ -142,7 +124,6 @@ def information_gap_vocab(n_attributes, n_values, dataset, sender, device, vocab
     return information_gap_representation(attributes, histograms[:, 1:])
 
 
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 def edit_dist(_list):
     distances = []
     count = 0
@@ -150,11 +131,7 @@ def edit_dist(_list):
         for j, el2 in enumerate(_list[i + 1 :]):
             count += 1
             # Normalized edit distance (same in our case as length is fixed)
-<<<<<<< HEAD
             distances.append(editdistance(el1, el2) / len(el1))
-=======
-            distances.append(editdistance.eval(el1, el2) / len(el1))
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     return distances
 
 
@@ -166,11 +143,6 @@ def cosine_dist(_list):
     return distances
 
 
-<<<<<<< HEAD
-def context_independence(n_attributes, n_values, attributes, strings) -> float:
-    # see https://github.com/tomekkorbak/measuring-non-trivial-compositionality/blob/master/metrics/context_independence.py
-    num_concepts = n_values * n_attributes
-=======
 def topographic_similarity(n_attributes, n_values, dataset, sender, device):
     _attributes, strings, meanings = ask_sender(
         n_attributes, n_values, dataset, sender, device
@@ -192,7 +164,6 @@ def context_independence(n_attributes, n_values, dataset, sender, device) -> flo
         n_attributes, n_values, dataset, sender, device
     )
 
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     character_set = set(c.item() for message in strings for c in message)
     character_set.discard(1) # 1 is just the END token
     vocab = {char: idx for idx, char in enumerate(character_set)} # create a dictionary
@@ -235,32 +206,22 @@ def compute_concept_symbol_matrix(
 
 
 class CompoEvaluator(core.Callback):
-<<<<<<< HEAD
     def __init__(self, dataset, device, n_attributes, n_values, vocab_size, is_distributed, is_population=False, epochs=[]):
         self.dataset = dataset
         self.device = device
         self.is_distributed = is_distributed
-=======
-    def __init__(self, dataset, device, n_attributes, n_values, vocab_size, epochs=[]):
-        self.dataset = dataset
-        self.device = device
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         self.n_attributes = n_attributes
         self.n_values = n_values
         self.epoch = 0
         self.vocab_size = vocab_size
         self.epochs_to_save = epochs
         self.stats = {}
-<<<<<<< HEAD
         self.population_based = is_population
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     def dump_stats(self):
         game = self.trainer.game
         game.eval()
 
-<<<<<<< HEAD
         if not self.population_based:
             # Makes one sender compatible with population of senders (which is iterated over and aggregated)
             senders = [game.module.sender] if self.is_distributed else [game.sender]
@@ -295,33 +256,6 @@ class CompoEvaluator(core.Callback):
         )
 
         output_json = json.dumps(self.stats)
-=======
-        positional_disent = information_gap_position(
-            self.n_attributes, self.n_values, self.dataset, game.sender, self.device
-        )
-        bos_disent = information_gap_vocab(
-            self.n_attributes,
-            self.n_values,
-            self.dataset,
-            game.sender,
-            self.device,
-            self.vocab_size,
-        )
-        topo_sim = topographic_similarity(
-            self.n_attributes, self.n_values, self.dataset, game.sender, self.device
-        )
-        context_ind = context_independence(self.n_attributes, self.n_values, self.dataset, game.sender, self.device)
-
-        output = dict(
-            epoch=self.epoch,
-            positional_disent=positional_disent,
-            bag_of_symbol_disent=bos_disent,
-            topographic_sim=topo_sim,
-            context_independence=context_ind
-        )
-        self.stats = output
-        output_json = json.dumps(output)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         print(output_json, flush=True)
         game.train()
 
@@ -339,35 +273,24 @@ class CompoEvaluator(core.Callback):
         # Save to interaction
         for k, v in self.stats.items():
             if k != 'epoch':
-<<<<<<< HEAD
                 logs.aux['compo_metrics/{}'.format(k)] = torch.Tensor(v)
 
 
 class HoldoutEvaluator(core.Callback):
     def __init__(self, loaders_metrics, device, is_distributed, is_population, epochs=[]):
-=======
-                logs.aux['compo_metrics/{}'.format(k)] = torch.Tensor([v])
 
 
-class HoldoutEvaluator(core.Callback):
-    def __init__(self, loaders_metrics, device, epochs=[]):
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         self.loaders_metrics = loaders_metrics
         self.device = device
         self.epoch = 0
         self.epochs = epochs
-<<<<<<< HEAD
         self.is_distributed = is_distributed
         self.is_population = is_population
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         self.results = {}
 
     def evaluate(self):
         game = self.trainer.game
-<<<<<<< HEAD
         game_skip_bc = game.skip_bc
-        game.skip_bc = True
         game.eval()
         old_loss = game.loss if not self.is_distributed else game.module.loss
 
@@ -378,29 +301,17 @@ class HoldoutEvaluator(core.Callback):
                 game.module.loss = metric
             else:
                 game.loss = metric
-=======
-        game.eval()
-        old_loss = game.loss
-
-        for loader_name, loader, metric in self.loaders_metrics:
-
-            acc_or, acc = 0.0, 0.0
-            n_batches = 0
-            game.loss = metric
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
             for batch in loader:
                 n_batches += 1
                 if not isinstance(batch, Batch):
                     batch = Batch(*batch)
                 batch = batch.to(self.device)
-<<<<<<< HEAD
-                _, interaction = game(*batch)
-=======
-                with torch.no_grad():
+                
+		with torch.no_grad():
                     _, interaction = game(*batch)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
-                acc += interaction.aux["acc"].mean().item()
+                
+		acc += interaction.aux["acc"].mean().item()
 
                 acc_or += interaction.aux["acc_or"].mean().item()
             self.results[loader_name] = {
@@ -412,7 +323,6 @@ class HoldoutEvaluator(core.Callback):
         output_json = json.dumps(self.results)
         print(output_json, flush=True)
 
-<<<<<<< HEAD
         if self.is_distributed:
             game.module.loss = old_loss
         else:
@@ -472,36 +382,23 @@ class HoldoutEvaluator(core.Callback):
 
     def on_train_end(self):
         self.evaluate() if not self.is_population else self.evaluate_population()
-=======
         game.loss = old_loss
         game.train()
 
-    def on_train_end(self):
-        self.evaluate()
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     def on_epoch_end(self, _loss, logs: Interaction, epoch: int):
         self.epoch += 1
 
         if self.epoch not in self.epochs: return
-<<<<<<< HEAD
         self.evaluate() if not self.is_population else self.evaluate_population()
-=======
-
-        self.evaluate()
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
-        # Save to Interaction
+        
+	# Save to Interaction
         for loader_name in self.results:
             if loader_name == 'epoch':
                 continue
             for k, v in self.results[loader_name].items():
-<<<<<<< HEAD
                 if type(v) != list: v = [v]
                 logs.aux['{}/{}'.format(loader_name, k)] = torch.Tensor(v)
-=======
-                logs.aux['{}/{}'.format(loader_name, k)] = torch.Tensor([v])
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         
 
 class BehaviouralCloning(core.Callback):
@@ -514,7 +411,6 @@ class BehaviouralCloning(core.Callback):
         self.sender_rcvr_imitation_reinforce_weight = sender_rcvr_imitation_reinforce_weight
 
         self.kick = kick # imitation, none, or fixed
-<<<<<<< HEAD
         self.ablation = opts.ablation # all, receiver_only, or sender_only
         self.epoch = 0
         self.freq = freq
@@ -525,14 +421,6 @@ class BehaviouralCloning(core.Callback):
         self.trainer = trainer_instance
         self.receiver, self.sender = self.trainer.game.receiver, self.trainer.game.sender
 
-    def train_bc(self, logs):
-        if self.kick == 'imitation':
-            self.expert_optimizer.zero_grad()
-        self.trainer.game.train_bc(logs, eval=True)
-=======
-        self.epoch = 0
-        self.freq = freq
-        self.results = {}
     
     def train_bc(self, logs):
         bc_speaker, bc_receiver = bc_agents_setup(self.opts, self.device, *define_agents(self.opts))
@@ -571,19 +459,16 @@ class BehaviouralCloning(core.Callback):
                 for param in game.receiver.parameters():
                     param.add_(
                         torch.randn(param.size(), device=device) * rcvr_grads[curr_epoch] * torch.sqrt(torch.pi / 2))
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
         if self.kick == 'imitation':
             self.expert_optimizer.step()
 
-<<<<<<< HEAD
     def on_epoch_end(self, _loss, logs: Interaction, epoch: int):
         # print('in bc callback')
         self.epoch += 1
 
         if self.freq > 0 and (self.epoch % self.freq == 0 or self.epoch == 1):
             self.train_bc(logs)
-=======
         # Save to Interaction
         for k, v in self.results.items():
             logs.aux['imitation/{}'.format(k)] = torch.Tensor([v])  # backwards compatibility w/ core.
@@ -595,7 +480,6 @@ class BehaviouralCloning(core.Callback):
             return
 
         self.train_bc(logs)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
 
 class BehaviouralCloningConvergence(EarlyStopper):
@@ -605,14 +489,10 @@ class BehaviouralCloningConvergence(EarlyStopper):
     """
 
     def __init__(
-<<<<<<< HEAD
         self, opts, bc_opts, optimizer,
             kick: str, threshold: float=1.1, conv_epsilon:float=0.0,
             interactions_dir: str='./interactions',
             field_name: str = "acc", validation: bool = False,
-=======
-        self, opts, bc_opts, optimizer, kick: str, threshold: float, field_name: str = "acc", validation: bool = False,
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             sender_rcvr_imitation_reinforce_weight: float=0.0
     ) -> None:
         """
@@ -629,7 +509,6 @@ class BehaviouralCloningConvergence(EarlyStopper):
         self.device = opts.device
         self.expert_optimizer = optimizer
         self.threshold = threshold
-<<<<<<< HEAD
         self.conv_epsilon = conv_epsilon
         self.ablation = opts.ablation # all, receiver_only, or sender_only
         self.field_name = field_name
@@ -645,14 +524,8 @@ class BehaviouralCloningConvergence(EarlyStopper):
                                     imitation=(self.kick == 'imitation'),
                                     sender_aware_weight=self.sender_rcvr_imitation_reinforce_weight)
 
-    def train_bc(self, logs):
-        # print('TRAIN BC')
-=======
-        self.field_name = field_name
-        self.sender_rcvr_imitation_reinforce_weight = sender_rcvr_imitation_reinforce_weight
 
     def train_bc(self, logs):
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         bc_speaker, bc_receiver = bc_agents_setup(self.opts, self.device, *define_agents(self.opts))
         bc_optimizer_r = torch.optim.Adam(bc_receiver.parameters(), lr=self.opts.lr)
         bc_optimizer_s = torch.optim.Adam(bc_speaker.parameters(), lr=self.opts.lr)
@@ -661,7 +534,6 @@ class BehaviouralCloningConvergence(EarlyStopper):
         if self.kick == 'imitation':
             self.expert_optimizer.zero_grad()
 
-<<<<<<< HEAD
         s_loss, r_loss, \
         s_policy_loss, r_policy_loss, \
         s_t, r_t, \
@@ -676,22 +548,10 @@ class BehaviouralCloningConvergence(EarlyStopper):
             s_policy_loss, r_policy_loss = s_policy_loss.detach(), r_policy_loss.detach()
             s_loss, r_loss = s_loss.detach(), r_loss.detach()
 
-=======
-        s_loss, r_loss, t, last_s_acc, last_r_acc, cumu_s_acc, cumu_r_acc = train_bc(
-            self.bc_opts,
-            bc_speaker, bc_receiver,
-            bc_optimizer_s, bc_optimizer_r,
-            self.trainer,
-            imitation=(self.kick == 'imitation'),
-            sender_aware_weight=self.sender_rcvr_imitation_reinforce_weight
-        )
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         results = dict(
             epoch=self.epoch,
             bc_s_loss=s_loss.item(),
             bc_r_loss=r_loss.item(),
-<<<<<<< HEAD
             bc_s_policy_loss=s_policy_loss.item(),
             bc_r_policy_loss=r_policy_loss.item(),
             imitation_s_acc=last_s_acc.item(),
@@ -701,11 +561,9 @@ class BehaviouralCloningConvergence(EarlyStopper):
             sample_complexity=max(s_t, r_t),
             sender_sample_complexity=s_t,
             receiver_sample_complexity=r_t
-=======
             imitation_s_acc=last_s_acc.item(),
             imitation_r_acc=last_r_acc.item(),
             sample_complexity=t,
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         )
         self.results = results
 
@@ -726,7 +584,6 @@ class BehaviouralCloningConvergence(EarlyStopper):
         for k, v in self.results.items():
             logs.aux['imitation/{}'.format(k)] = torch.Tensor([v])  # backwards compatibility w/ core.
 
-<<<<<<< HEAD
         # Dump interaction
         InteractionSaver.dump_interactions(
             logs,
@@ -736,21 +593,15 @@ class BehaviouralCloningConvergence(EarlyStopper):
             self.interactions_dir
         )
 
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     def on_epoch_end(self, loss: float, logs: Interaction, epoch: int) -> None:
         if self.validation:
             return
         self.epoch = epoch
         self.train_stats.append((loss, logs))
         if self.should_stop():
-<<<<<<< HEAD
             self.trainer.game.receiver.deterministic_mode()
             self.train_bc(logs)
             self.trainer.game.receiver.reinforce_mode()
-=======
-            self.train_bc(logs)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     def on_validation_end(self, loss: float, logs: Interaction, epoch: int) -> None:
         if not self.validation:
@@ -773,10 +624,5 @@ class BehaviouralCloningConvergence(EarlyStopper):
 
         metric_mean = last_epoch_interactions.aux[self.field_name].mean()
 
-<<<<<<< HEAD
         return metric_mean >= self.threshold or \
                max(self.trainer.last_grad_receiver, self.trainer.last_grad_sender) < self.conv_epsilon
-=======
-        return metric_mean >= self.threshold
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0

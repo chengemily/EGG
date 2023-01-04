@@ -7,11 +7,7 @@ import json
 from collections import defaultdict
 from typing import Callable, Union
 
-<<<<<<< HEAD
 #import editdistance
-=======
-import editdistance
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 import numpy as np
 import torch
 from scipy.spatial import distance
@@ -21,7 +17,6 @@ from .callbacks import Callback
 from .interaction import Interaction
 
 
-<<<<<<< HEAD
 def editdistance(s1, s2):
     if len(s1) > len(s2):
         s1, s2 = s2, s1
@@ -37,9 +32,6 @@ def editdistance(s1, s2):
         distances = distances_
     return distances[-1]
 
-
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 def gap_mi_first_second(attributes, representations):
     gaps = torch.zeros(representations.size(1))
     non_constant_positions = 0.0
@@ -195,11 +187,7 @@ class TopographicSimilarity(Callback):
     ) -> float:
 
         distances = {
-<<<<<<< HEAD
             "edit": lambda x, y: editdistance(x, y) / ((len(x) + len(y)) / 2),
-=======
-            "edit": lambda x, y: editdistance.eval(x, y) / ((len(x) + len(y)) / 2),
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             "cosine": distance.cosine,
             "hamming": distance.hamming,
             "jaccard": distance.jaccard,
@@ -376,9 +364,6 @@ class PrintValidationEvents(Callback):
     # same behaviour if we reached early stopping
     def on_early_stopping(self, _train_loss, _train_logs, epoch, _test_loss, test_logs):
         self.print_events(test_logs)
-<<<<<<< HEAD
 
 if __name__=='__main__':
     editdistance('abc', 'aaa')
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0

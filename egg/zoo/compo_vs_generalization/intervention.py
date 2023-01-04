@@ -15,23 +15,12 @@ from scipy.stats import spearmanr
 
 import egg.core as core
 from egg.core.batch import Batch
-<<<<<<< HEAD
-from egg.zoo.imitation_learning.util import entropy, mutual_info
 
 try:
     # import editdistance  # package to install https://pypi.org/project/editdistance/0.3.1/
     from egg.core.language_analysis import editdistance
-=======
 from egg.zoo.language_bottleneck.intervention import entropy, mutual_info
 
-try:
-    import editdistance  # package to install https://pypi.org/project/editdistance/0.3.1/
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
-except ImportError:
-    print(
-        "Please install editdistance package: `pip install editdistance`. "
-        "It is used for calculating topographic similarity."
-    )
 
 
 def ask_sender(n_attributes, n_values, dataset, sender, device):
@@ -116,11 +105,7 @@ def edit_dist(_list):
         for j, el2 in enumerate(_list[i + 1 :]):
             count += 1
             # Normalized edit distance (same in our case as length is fixed)
-<<<<<<< HEAD
             distances.append(editdistance(el1, el2) / len(el1))
-=======
-            distances.append(editdistance.eval(el1, el2) / len(el1))
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     return distances
 
 
@@ -263,10 +248,6 @@ class Evaluator(core.Callback):
         old_loss = game.loss
 
         for loader_name, loader, metric in self.loaders_metrics:
-<<<<<<< HEAD
-=======
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             acc_or, acc = 0.0, 0.0
             n_batches = 0
             game.loss = metric

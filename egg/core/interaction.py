@@ -20,10 +20,7 @@ class LoggingStrategy:
     store_aux_input: bool = True
     store_message: bool = True
     store_receiver_output: bool = True
-<<<<<<< HEAD
     store_receiver_sample: bool = True
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     store_message_length: bool = True
 
     def filtered_interaction(
@@ -34,10 +31,7 @@ class LoggingStrategy:
         aux_input: Optional[Dict[str, torch.Tensor]],
         message: Optional[torch.Tensor],
         receiver_output: Optional[torch.Tensor],
-<<<<<<< HEAD
         receiver_sample: Optional[torch.Tensor],
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         message_length: Optional[torch.Tensor],
         aux: Dict[str, torch.Tensor],
     ):
@@ -49,10 +43,7 @@ class LoggingStrategy:
             aux_input=aux_input if self.store_aux_input else None,
             message=message if self.store_message else None,
             receiver_output=receiver_output if self.store_receiver_output else None,
-<<<<<<< HEAD
             receiver_sample=receiver_sample if self.store_receiver_sample else None,
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             message_length=message_length if self.store_message_length else None,
             aux=aux,
         )
@@ -78,10 +69,7 @@ class Interaction:
     # what agents produce
     message: Optional[torch.Tensor]
     receiver_output: Optional[torch.Tensor]
-<<<<<<< HEAD
     receiver_sample: Optional[torch.Tensor]
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     # auxilary info
     message_length: Optional[torch.Tensor]
@@ -95,10 +83,7 @@ class Interaction:
             self.labels,
             self.message,
             self.receiver_output,
-<<<<<<< HEAD
             self.receiver_sample,
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             self.message_length,
         ]
         for t in interaction_fields:
@@ -120,10 +105,7 @@ class Interaction:
         self.labels = _to(self.labels)
         self.message = _to(self.message)
         self.receiver_output = _to(self.receiver_output)
-<<<<<<< HEAD
         self.receiver_sample = _to(self.receiver_sample)
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         self.message_length = _to(self.message_length)
 
         if self.aux_input:
@@ -193,20 +175,13 @@ class Interaction:
             message=_check_cat([x.message for x in interactions]),
             message_length=_check_cat([x.message_length for x in interactions]),
             receiver_output=_check_cat([x.receiver_output for x in interactions]),
-<<<<<<< HEAD
             receiver_sample=_check_cat([x.receiver_sample for x in interactions]),
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             aux=aux,
         )
 
     @staticmethod
     def empty() -> "Interaction":
-<<<<<<< HEAD
         return Interaction(None, None, None, {}, None, None, None, None, {})
-=======
-        return Interaction(None, None, None, {}, None, None, None, {})
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     @staticmethod
     def gather_distributed_interactions(log: "Interaction") -> Optional["Interaction"]:
@@ -244,10 +219,7 @@ class Interaction:
                 "message",
                 "message_length",
                 "receiver_output",
-<<<<<<< HEAD
                 "receiver_sample",
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             ]
         )
 

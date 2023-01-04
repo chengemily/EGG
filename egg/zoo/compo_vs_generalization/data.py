@@ -51,10 +51,6 @@ def select_subset_V2(data, n_subset, n_attributes, n_values, random_seed=7):
         if start > 0:
             sampled_data.append(data[start])
         start += n_values + 1
-<<<<<<< HEAD
-
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     # Sample remaining
     to_sample = (n_subset ** n_attributes) - len(sampled_data)
     tobesampled = copy.deepcopy(data)
@@ -88,10 +84,6 @@ def split_holdout(dataset):
             hold_out.append(values)
         else:
             pass
-<<<<<<< HEAD
-=======
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     return train, hold_out
 
 

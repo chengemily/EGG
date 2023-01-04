@@ -84,7 +84,6 @@ def maybe_init_distributed(args) -> DistributedContext:
                 world_size=world_size,
                 mode="slurm",
             )
-<<<<<<< HEAD
             try:
                 dist.init_process_group(
                     backend="nccl",
@@ -95,14 +94,6 @@ def maybe_init_distributed(args) -> DistributedContext:
             except RuntimeError as e:
                 # if e.message == 'trying to initialize the default process group twice!':
                 pass
-=======
-            dist.init_process_group(
-                backend="nccl",
-                init_method=init_method,
-                world_size=world_size,
-                rank=rank,
-            )
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     return context
 

@@ -8,11 +8,6 @@ from .callbacks import (
     CheckpointSaver,
     ConsoleLogger,
     InteractionSaver,
-<<<<<<< HEAD
-    #ProgressBarLogger,
-=======
-    ProgressBarLogger,
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     TemperatureUpdater,
     TensorboardLogger,
 )
@@ -45,10 +40,7 @@ from .reinforce_wrappers import (
     ReinforceDeterministicWrapper,
     ReinforceWrapper,
     RnnReceiverDeterministic,
-<<<<<<< HEAD
     RnnReceiverReinforceDeterministic,
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     RnnReceiverReinforce,
     RnnSenderReinforce,
     SenderReceiverRnnReinforce,
@@ -92,10 +84,7 @@ __all__ = [
     "SenderReceiverRnnReinforce",
     "CommunicationRnnReinforce",
     "RnnReceiverDeterministic",
-<<<<<<< HEAD
     "RnnReceiverReinforceDeterministic",
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     "RnnSenderGS",
     "RnnReceiverGS",
     "SenderReceiverRnnGS",

@@ -107,10 +107,6 @@ class ReinforceDeterministicWrapper(nn.Module):
     >>> (entropy == 0).all().item()
     1
     """
-<<<<<<< HEAD
-=======
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     def __init__(self, agent):
         super(ReinforceDeterministicWrapper, self).__init__()
         self.agent = agent
@@ -269,12 +265,9 @@ class RnnSenderReinforce(nn.Module):
         assert max_len >= 1, "Cannot have a max_len below 1"
         self.max_len = max_len
 
-<<<<<<< HEAD
         self.layer_norm_h = nn.LayerNorm(hidden_size)
         self.layer_norm_c = nn.LayerNorm(hidden_size)
 
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         self.hidden_to_output = nn.Linear(hidden_size, vocab_size)
         self.embedding = nn.Embedding(vocab_size, embed_dim)
         self.sos_embedding = nn.Parameter(torch.zeros(embed_dim))
@@ -325,7 +318,6 @@ class RnnSenderReinforce(nn.Module):
             for i, layer in enumerate(self.cells):
                 if isinstance(layer, nn.LSTMCell):
                     h_t, c_t = layer(input, (prev_hidden[i], prev_c[i]))
-<<<<<<< HEAD
                     c_t = self.layer_norm_c(c_t)
                     prev_c[i] = c_t
                 else:
@@ -337,14 +329,6 @@ class RnnSenderReinforce(nn.Module):
                 input = h_t
 
             # layer norm to hidden layer before the last output layer.
-=======
-                    prev_c[i] = c_t
-                else:
-                    h_t = layer(input, prev_hidden[i])
-                prev_hidden[i] = h_t
-                input = h_t
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             step_logits = F.log_softmax(self.hidden_to_output(h_t), dim=1)
             predicted_dist.append(step_logits)
 
@@ -391,10 +375,7 @@ class RnnReceiverReinforce(nn.Module):
 
     def forward(self, message, input=None, aux_input=None, lengths=None):
         encoded = self.encoder(message, lengths)
-<<<<<<< HEAD
-        print(378)
         sample, logits, entropy = self.agent(encoded, input, aux_input)
-        print(380)
         return sample, logits, entropy, None
 
 
@@ -468,11 +449,6 @@ class RnnReceiverReinforceDeterministic(nn.Module):
             # print('new agent output shape: ', agent_output.shape)
 
         return agent_output, log_probs, entropy, {'sample': sample, 'is_reinforce': self.reinforce}
-=======
-        sample, logits, entropy, _ = self.agent(encoded, input, aux_input)
-
-        return sample, logits, entropy, None
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
 
 class RnnReceiverDeterministic(nn.Module):
@@ -512,18 +488,10 @@ class RnnReceiverDeterministic(nn.Module):
     def forward(self, message, input=None, aux_input=None, lengths=None):
         encoded = self.encoder(message, lengths)
         agent_output = self.agent(encoded, input, aux_input)
-<<<<<<< HEAD
         logits = torch.zeros(agent_output.size(0)).to(agent_output.device)
         entropy = logits
 
         return agent_output, logits, entropy, None
-=======
-
-        logits = torch.zeros(agent_output.size(0)).to(agent_output.device)
-        entropy = logits
-
-        return agent_output, logits, entropy
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
 
 class SenderReceiverRnnReinforce(nn.Module):
@@ -673,8 +641,6 @@ class CommunicationRnnReinforce(nn.Module):
         aux_input=None,
     ):
         message, log_prob_s, entropy_s, probas_s = sender(sender_input, aux_input)
-<<<<<<< HEAD
-        # print(645)
         message_length = find_lengths(message)
         # print('message size: ', message.shape)
         # print('message length: ', message_length)
@@ -698,57 +664,19 @@ class CommunicationRnnReinforce(nn.Module):
         # print('log prob size: ', log_prob_s.shape)
         # print('effective entropy_s shape: ', effective_entropy_s.shape)
         # print('effective log prob s shape: ', effective_log_prob_s.shape)
-=======
-        message_length = find_lengths(message)
-        receiver_output, log_prob_r, entropy_r = receiver(
-            message, receiver_input, aux_input, message_length
-        )
-
-        loss, aux_info = loss(
-            sender_input, message, receiver_input, receiver_output, labels, aux_input
-        )
-
-        # the entropy of the outputs of S before and including the eos symbol - as we don't care about what's after
-        effective_entropy_s = torch.zeros_like(entropy_r)
-
-        # the log prob of the choices made by S before and including the eos symbol - again, we don't
-        # care about the rest
-        effective_log_prob_s = torch.zeros_like(log_prob_r)
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         for i in range(message.size(1)):
             not_eosed = (i < message_length).float()
             effective_entropy_s += entropy_s[:, i] * not_eosed
             effective_log_prob_s += log_prob_s[:, i] * not_eosed
-<<<<<<< HEAD
-        # print(668)
-        # print(effective_entropy_s.shape)
-        # print(effective_log_prob_s.shape)
-        # print(message_length)
-        effective_entropy_s = effective_entropy_s / message_length.float()
-        # print(667)
-=======
 
         effective_entropy_s = effective_entropy_s / message_length.float()
 
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         weighted_entropy = (
             effective_entropy_s.mean() * self.sender_entropy_coeff
             + entropy_r.mean() * self.receiver_entropy_coeff
         )
-<<<<<<< HEAD
-        # print(672)
         log_prob = effective_log_prob_s + log_prob_r
-        # print(674)
         length_loss = message_length.float() * self.length_cost
-        # print(676)
-=======
-
-        log_prob = effective_log_prob_s + log_prob_r
-
-        length_loss = message_length.float() * self.length_cost
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         policy_length_loss = (
             (length_loss - self.baselines["length"].predict(length_loss))
             * effective_log_prob_s
@@ -756,12 +684,8 @@ class CommunicationRnnReinforce(nn.Module):
         policy_loss = (
             (loss.detach() - self.baselines["loss"].predict(loss.detach())) * log_prob
         ).mean()
-<<<<<<< HEAD
-        # print(684)
-=======
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
-        optimized_loss = policy_length_loss + policy_loss - weighted_entropy
+        
+	optimized_loss = policy_length_loss + policy_loss - weighted_entropy
         # if the receiver is deterministic/differentiable, we apply the actual loss
         optimized_loss += loss.mean()
 
@@ -772,10 +696,7 @@ class CommunicationRnnReinforce(nn.Module):
         aux_info["sender_entropy"] = entropy_s.detach()
         aux_info["receiver_entropy"] = entropy_r.detach()
         aux_info["length"] = message_length.float()  # will be averaged
-<<<<<<< HEAD
         aux_info["probas_s"] = probas_s.detach()
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
         logging_strategy = (
             self.train_logging_strategy if self.training else self.test_logging_strategy
@@ -787,10 +708,7 @@ class CommunicationRnnReinforce(nn.Module):
             aux_input=aux_input,
             message= message.detach(),
             receiver_output=receiver_output.detach(),
-<<<<<<< HEAD
             receiver_sample=receiver_output.detach(),
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             message_length=message_length,
             aux=aux_info,
         )
@@ -1006,8 +924,4 @@ class TransformerSenderReinforce(nn.Module):
         logits = torch.cat([logits, zeros], dim=1)
         entropy = torch.cat([entropy, zeros], dim=1)
 
-<<<<<<< HEAD
-        return sequence, logits, entropy,
-=======
         return sequence, logits, entropy
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0

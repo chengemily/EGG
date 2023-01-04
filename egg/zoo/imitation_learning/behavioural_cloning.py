@@ -63,20 +63,13 @@ def eval_bc_original_task(new_trainer, t=None, checkpoint_path=None):
 
 
 def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, trainer,
-<<<<<<< HEAD
              new_trainer=None, ablation='all', imitation=False, perf_log=None, sender_aware_weight=0.0):
     new_receiver_converged = ablation == 'sender_only'
     new_sender_converged = ablation == 'receiver_only'
-=======
-             new_trainer=None, imitation=False, perf_log=None, sender_aware_weight=0.0):
-    new_receiver_converged = False
-    new_sender_converged = False
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     receiver_converged_epoch, sender_converged_epoch = 0, 0
     cumu_r_loss, cumu_s_loss = torch.zeros(bc_args.n_epochs_bc), torch.zeros(bc_args.n_epochs_bc)
     cumu_r_acc, cumu_s_acc = torch.empty(bc_args.n_epochs_bc), torch.empty(bc_args.n_epochs_bc)
     reinforce_loss_for_sender = torch.zeros(bc_args.n_epochs_bc)
-<<<<<<< HEAD
     r_loss = s_loss = r_acc = s_acc = torch.Tensor([0.0])
 
     for t in range(bc_args.n_epochs_bc):
@@ -87,16 +80,6 @@ def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, traine
             r_loss, s_loss, r_acc, s_acc = eval_bc_prediction(new_sender, new_receiver, trainer, t)
             if new_trainer is not None:
                 mean_loss, acc, acc_or = eval_bc_original_task(new_trainer, t)
-=======
-
-    for t in range(bc_args.n_epochs_bc):
-        val = t % bc_args.val_interval == 0
-        if val:
-            new_sender.eval()
-            new_receiver.eval()
-            r_loss, s_loss, r_acc, s_acc = eval_bc_prediction(new_sender, new_receiver, trainer, t)
-            if new_trainer is not None: mean_loss, acc, acc_or = eval_bc_original_task(new_trainer, t)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
             if perf_log is not None:
                 log_performance(perf_log, r_loss.item(),
@@ -113,11 +96,7 @@ def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, traine
                 optimizer_r,
                 new_receiver,
                 interaction,
-<<<<<<< HEAD
                 expert=None,#trainer.game.receiver,
-=======
-                expert=trainer.game.receiver,
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
                 imitation=imitation,
                 aux_info={'expert_sender': train.game.sender if sender_aware_weight > 0 else None,
                         'sender_aware': sender_aware_weight > 0}
@@ -125,11 +104,7 @@ def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, traine
             reinforce_loss_for_sender[t] = aux_info['reinforce_loss']
             cumu_r_loss[t] = r_loss
             cumu_r_acc[t] = r_acc
-<<<<<<< HEAD
             new_receiver_converged = r_acc >= 0.999
-=======
-            new_receiver_converged = get_grad_norm(new_receiver) < bc_args.convergence_epsilon
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             receiver_converged_epoch = t
         if not new_sender_converged:
             new_sender.train()
@@ -137,20 +112,12 @@ def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, traine
                 optimizer_s,
                 new_sender,
                 interaction,
-<<<<<<< HEAD
                 expert=None,#trainer.game.sender,
-=======
-                expert=trainer.game.sender,
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
                 imitation=imitation
             )
             cumu_s_loss[t] = s_loss
             cumu_s_acc[t] = s_acc
-<<<<<<< HEAD
             new_sender_converged = s_acc >= 0.999
-=======
-            new_sender_converged = get_grad_norm(new_sender) < bc_args.convergence_epsilon
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             sender_converged_epoch = t
 
         if new_receiver_converged and new_sender_converged:
@@ -161,11 +128,8 @@ def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, traine
     cumu_s_loss += sender_aware_weight * reinforce_loss_for_sender
     cumu_s_loss = cumu_s_loss.sum()
     cumu_r_loss = cumu_r_loss.sum()
-<<<<<<< HEAD
+    
     return cumu_s_loss, cumu_r_loss, sender_converged_epoch, receiver_converged_epoch, s_acc, r_acc, cumu_s_acc, cumu_r_acc
-=======
-    return cumu_s_loss, cumu_r_loss, t, s_acc, r_acc, cumu_s_acc, cumu_r_acc
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
 
 def train_epoch(optimizer, agent, interaction, expert=None, imitation=False, aux_info={}):
@@ -176,7 +140,6 @@ def train_epoch(optimizer, agent, interaction, expert=None, imitation=False, aux
     return loss, acc, aux
 
 
-<<<<<<< HEAD
 def main(bc_params):
     bc_args = get_bc_params(bc_params)
 
@@ -184,41 +147,25 @@ def main(bc_params):
                  'checkpoint_wrapper_randomseed{}.pkl'.format(bc_args.expert_seed)
 
     random.seed(bc_args.bc_random_seed)
-=======
-def main(metadata_path: str, bc_params, expert_seed):
-    bc_args = get_bc_params(bc_params)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     checkpoint_wrapper = load_metadata_from_pkl(metadata_path)
 
     params = checkpoint_wrapper['params']
     params.append('--load_from_checkpoint={}'.format(checkpoint_wrapper['checkpoint_path']))
     params = list(filter(lambda x: 'random_seed' not in x, params))
     params.append('--random_seed={}'.format(bc_args.bc_random_seed))
-<<<<<<< HEAD
     opts = compo_vs_generalization.get_params(params)
-=======
-    opts = get_params(params)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
 
     # New agents
-<<<<<<< HEAD
     new_sender, new_receiver = bc_agents_setup(opts, bc_args, device,
                                                *compo_vs_generalization.define_agents(opts))
-=======
-    new_sender, new_receiver = bc_agents_setup(opts, device, *define_agents(opts))
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     optimizer_r = torch.optim.Adam(new_receiver.parameters(), lr=opts.lr)
     optimizer_s = torch.optim.Adam(new_sender.parameters(), lr=opts.lr)
 
     # Dataloader
     trainer = expert_setup(opts)
-<<<<<<< HEAD
     new_trainer = expert_setup(opts)
-=======
-    new_trainer = copy.deepcopy(trainer)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
     new_trainer.game.sender, new_trainer.game.receiver = new_sender.agent, new_receiver.agent
 
     # Logging
@@ -234,15 +181,11 @@ def main(metadata_path: str, bc_params, expert_seed):
         'epoch_speaker': [],
         'epoch_receiver': []
     }
-<<<<<<< HEAD
+    
     cumu_s_loss, cumu_r_loss, sender_converged_epoch, receiver_converged_epoch, s_acc, r_acc, cumu_s_acc, cumu_r_acc\
             = train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, trainer, new_trainer, perf_log=perf_log)
 
     t = max(sender_converged_epoch, receiver_converged_epoch)
-=======
-
-    train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, trainer, new_trainer, perf_log)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     # Last validation score
     print('==============================================')
@@ -257,63 +200,25 @@ def main(metadata_path: str, bc_params, expert_seed):
     print('Expert validation on original task')
     eval_expert_original_task(trainer)
 
-<<<<<<< HEAD
     log_performance(perf_log, r_loss.item(), s_loss.item(), r_acc.item(), s_acc.item(), mean_loss, acc.item(),
                     acc_or.item(), sender_converged_epoch,
-=======
-    log_performance(perf_log, r_loss.item(), s_loss.item(), r_acc.item(), s_acc.item(), mean_loss, acc.item(), acc_or.item(), sender_converged_epoch,
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
                     receiver_converged_epoch)
 
     # Save BC model
     if bc_args.save_bc:
         save_behavioral_clones(bc_args, params, new_receiver, new_sender,
-<<<<<<< HEAD
                                optimizer_r, optimizer_s, metadata_path, perf_log, bc_args.expert_seed)
-=======
-                               optimizer_r, optimizer_s, metadata_path, perf_log, expert_seed)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     core.close()
 
 
-<<<<<<< HEAD
-=======
-
-
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 if __name__=='__main__':
     import sys
     import random
 
-<<<<<<< HEAD
     params = sys.argv[1:]
     try:
         main(params)
     except(FileNotFoundError):
         pass
-=======
-    # for i in range(100):
-    #     try:
-    #         resave_compo_metrics_on_whole_dataset('saved_models/' +
-    #                                               'n_val_10_n_att_2_vocab_100_max_len_3_hidden_500/' +
-    #                                               'checkpoint_wrapper_randomseed{}.pkl'.format(i))
-    #     except:
-    #         continue
-
-    # # run program for all the things
-    for seed in range(101, 131):
-        print('Random seed: ', seed)
-        random.seed(seed)
-        params = sys.argv[1:].copy()
-        params.append('--bc_random_seed={}'.format(seed))
-        for i in range(100):
-            try:
-                main('saved_models/' +
-                     'n_val_10_n_att_2_vocab_100_max_len_3_hidden_500/' +
-                     'checkpoint_wrapper_randomseed{}.pkl'.format(i), params, i)
-            except(FileNotFoundError):
-                continue
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 

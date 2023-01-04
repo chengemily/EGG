@@ -1,6 +1,4 @@
-<<<<<<< HEAD
 import json
-
 import numpy as np
 import torch
 
@@ -57,26 +55,15 @@ def mutual_info(xs, ys):
 
     return e_x + e_y - e_xy
 
-=======
-import torch
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 def get_grad_norm(agent):
     with torch.no_grad():
         total_norm = 0
         for p in agent.parameters():
-<<<<<<< HEAD
             if p.grad is not None:
                 param_norm = p.grad.data.norm(2)
                 total_norm += param_norm.item() ** 2
         total_norm = total_norm ** (1. / 2)
     return total_norm
-=======
-            param_norm = p.grad.data.norm(2)
-            total_norm += param_norm.item() ** 2
-        total_norm = total_norm ** (1. / 2)
-        return total_norm
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
 def get_avg_grad_norm(agent):
     with torch.no_grad():

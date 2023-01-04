@@ -191,10 +191,6 @@ def init(
     if summary_writer is None and common_opts.tensorboard:
         try:
             from torch.utils.tensorboard import SummaryWriter
-<<<<<<< HEAD
-=======
-
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
             summary_writer = SummaryWriter(log_dir=common_opts.tensorboard_dir)
         except ModuleNotFoundError:
             raise ModuleNotFoundError(

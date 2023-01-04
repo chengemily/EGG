@@ -13,7 +13,6 @@ from collections import OrderedDict
 from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Union
 
 import torch
-<<<<<<< HEAD
 # import wandb
 #from rich.columns import Columns
 #from rich.console import RenderableType
@@ -26,20 +25,6 @@ import torch
 #)
 #from rich.table import Table
 #from rich.text import Text
-=======
-import wandb
-from rich.columns import Columns
-from rich.console import RenderableType
-from rich.progress import (
-    BarColumn,
-    Progress,
-    ProgressColumn,
-    TextColumn,
-    TimeRemainingColumn,
-)
-from rich.table import Table
-from rich.text import Text
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
 from egg.core.interaction import Interaction
 from egg.core.util import get_summary_writer
@@ -100,10 +85,6 @@ class ConsoleLogger(Callback):
 
     def on_validation_end(self, loss: float, logs: Interaction, epoch: int):
         self.aggregate_print(loss, logs, "test", epoch)
-<<<<<<< HEAD
-        # print('consolelogger val end done')
-=======
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
 
     def on_epoch_end(self, loss: float, logs: Interaction, epoch: int):
         if self.print_train_loss:
@@ -135,7 +116,6 @@ class TensorboardLogger(Callback):
         self.writer.close()
 
 
-<<<<<<< HEAD
 # class WandbLogger(Callback):
 #     def __init__(
 #         self,
@@ -175,48 +155,6 @@ class TensorboardLogger(Callback):
 #     def on_validation_end(self, loss: float, logs: Interaction, epoch: int):
 #         if self.trainer.distributed_context.is_leader:
 #             self.log_to_wandb({"validation_loss": loss, "epoch": epoch}, commit=True)
-=======
-class WandbLogger(Callback):
-    def __init__(
-        self,
-        opts: Union[argparse.ArgumentParser, Dict, str, None] = None,
-        project: Optional[str] = None,
-        run_id: Optional[str] = None,
-        **kwargs,
-    ):
-        # This callback logs to wandb the interaction as they are stored in the leader process.
-        # When interactions are not aggregated in a multigpu run, each process will store
-        # its own Interaction object in logs. For now, we leave to the user handling this case by
-        # subclassing WandbLogger and implementing a custom logic since we do not know a priori
-        # what type of data are to be logged.
-        self.opts = opts
-
-        wandb.init(project=project, id=run_id, **kwargs)
-        wandb.config.update(opts)
-
-    @staticmethod
-    def log_to_wandb(metrics: Dict[str, Any], commit: bool = False, **kwargs):
-        wandb.log(metrics, commit=commit, **kwargs)
-
-    def on_train_begin(self, trainer_instance: "Trainer"):  # noqa: F821
-        self.trainer = trainer_instance
-        wandb.watch(self.trainer.game, log="all")
-
-    def on_batch_end(
-        self, logs: Interaction, loss: float, batch_id: int, is_training: bool = True
-    ):
-        if is_training and self.trainer.distributed_context.is_leader:
-            self.log_to_wandb({"batch_loss": loss}, commit=True)
-
-    def on_epoch_end(self, loss: float, logs: Interaction, epoch: int):
-        if self.trainer.distributed_context.is_leader:
-            self.log_to_wandb({"train_loss": loss, "epoch": epoch}, commit=True)
-
-    def on_validation_end(self, loss: float, logs: Interaction, epoch: int):
-        if self.trainer.distributed_context.is_leader:
-            self.log_to_wandb({"validation_loss": loss, "epoch": epoch}, commit=True)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
-
 
 class TemperatureUpdater(Callback):
     def __init__(self, agent, decay=0.9, minimum=0.1, update_frequency=1):
@@ -350,10 +288,6 @@ class InteractionSaver(Callback):
 
         if checkpoint_dir:
             self.checkpoint_dir = pathlib.Path(checkpoint_dir) / "interactions"
-<<<<<<< HEAD
-=======
-            print('CHECKPOINT DIR: ', self.checkpoint_dir)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
         else:
             self.checkpoint_dir = pathlib.Path("./interactions")
 
@@ -392,7 +326,6 @@ class InteractionSaver(Callback):
                 self.dump_interactions(logs, "train", epoch, rank, self.checkpoint_dir)
 
 
-<<<<<<< HEAD
 #class CustomProgress(Progress):
 #    class CompletedColumn(ProgressColumn):
 #        def render(self, task):
@@ -619,231 +552,3 @@ class InteractionSaver(Callback):
 #            self.progress.update(self.train_p, refresh=True, advance=1)
 #        else:
 #            self.progress.update(self.test_p, refresh=True, advance=1)
-=======
-class CustomProgress(Progress):
-    class CompletedColumn(ProgressColumn):
-        def render(self, task):
-            """Calculate common unit for completed and total."""
-            download_status = f"{int(task.completed)}/{int(task.total)} btc"
-            return Text(download_status, style="progress.download")
-
-    class TransferSpeedColumn(ProgressColumn):
-        """Renders human readable transfer speed."""
-
-        def render(self, task):
-            """Show data transfer speed."""
-            speed = task.speed
-            if speed is None:
-                return Text("?", style="progress.data.speed")
-            speed = f"{speed:,.{2}f}"
-            return Text(f"{speed} btc/s", style="progress.data.speed")
-
-    def __init__(self, *args, use_info_table: bool = True, **kwargs):
-        super(CustomProgress, self).__init__(*args, **kwargs)
-
-        self.info_table = Table(show_footer=False)
-        self.info_table.add_column("Phase")
-
-        self.test_style = "black on white"
-        self.train_style = "white on black"
-        self.use_info_table = use_info_table
-
-    def add_info_table_cols(self, new_cols):
-        """
-        Add cols from ordered dict if not present in info_table
-        """
-
-        cols = set([x.header for x in self.info_table.columns])
-        missing = set(new_cols) - cols
-        if len(missing) == 0:
-            return
-
-        # iterate on new_cols since they are in order
-        for c in new_cols:
-            if c in missing:
-                self.info_table.add_column(c)
-
-    def update_info_table(self, aux: Dict[str, float], phase: str):
-        """
-        Update the info_table with the latest results
-        :param aux:
-        :param phase: either 'train' or 'test'
-        """
-
-        self.add_info_table_cols(aux.keys())
-        epoch = aux.pop("epoch")
-        aux = OrderedDict((k, f"{v:4.3f}") for k, v in aux.items())
-        if phase == "train":
-            st = self.train_style
-        else:
-            st = self.test_style
-        self.info_table.add_row(phase, str(epoch), *list(aux.values()), style=st)
-
-    def get_renderables(self) -> Iterable[RenderableType]:
-        """Display progress together with info table"""
-
-        # this method is called once before the init, so check if the attribute is present
-        if hasattr(self, "use_info_table"):
-            use_table = self.use_info_table
-            info_table = self.info_table
-        else:
-            use_table = False
-            info_table = Table()
-
-        if use_table:
-            task_table = self.make_tasks_table(self.tasks)
-            rendable = Columns((info_table, task_table), align="left", expand=True)
-        else:
-            rendable = self.make_tasks_table(self.tasks)
-
-        yield rendable
-
-
-class ProgressBarLogger(Callback):
-    """
-    Displays a progress bar with information about the current epoch and the epoch progression.
-    """
-
-    def __init__(
-        self,
-        n_epochs: int,
-        train_data_len: int = 0,
-        test_data_len: int = 0,
-        use_info_table: bool = True,
-    ):
-        """
-        :param n_epochs: total number of epochs
-        :param train_data_len: length of the dataset generation for training
-        :param test_data_len: length of the dataset generation for testing
-        :param use_info_table: true to add an information table on top of the progress bar
-        """
-
-        self.n_epochs = n_epochs
-        self.train_data_len = train_data_len
-        self.test_data_len = test_data_len
-        self.progress = CustomProgress(
-            TextColumn(
-                "[bold]Epoch {task.fields[cur_epoch]}/{task.fields[n_epochs]} | [blue]{task.fields[mode]}",
-                justify="right",
-            ),
-            BarColumn(bar_width=None),
-            "[progress.percentage]{task.percentage:>3.1f}%",
-            "•",
-            CustomProgress.CompletedColumn(),
-            "•",
-            CustomProgress.TransferSpeedColumn(),
-            "•",
-            TimeRemainingColumn(),
-            use_info_table=use_info_table,
-        )
-
-        self.progress.start()
-        self.train_p = self.progress.add_task(
-            description="",
-            mode="Train",
-            cur_epoch=0,
-            n_epochs=self.n_epochs,
-            start=False,
-            visible=False,
-            total=self.train_data_len,
-        )
-        self.test_p = self.progress.add_task(
-            description="",
-            mode="Test",
-            cur_epoch=0,
-            n_epochs=self.n_epochs,
-            start=False,
-            visible=False,
-            total=self.test_data_len,
-        )
-
-    @staticmethod
-    def build_od(logs, loss, epoch):
-        od = OrderedDict()
-        od["epoch"] = epoch
-        od["loss"] = loss
-        aux = {k: float(torch.mean(v)) for k, v in logs.aux.items()}
-        od.update(aux)
-
-        return od
-
-    def on_epoch_begin(self, epoch: int):
-        self.progress.reset(
-            task_id=self.train_p,
-            total=self.train_data_len,
-            start=False,
-            visible=False,
-            cur_epoch=epoch,
-            n_epochs=self.n_epochs,
-            mode="Train",
-        )
-        self.progress.start_task(self.train_p)
-        self.progress.update(self.train_p, visible=True)
-
-    def on_epoch_end(self, loss: float, logs: Interaction, epoch: int):
-        self.progress.stop_task(self.train_p)
-        self.progress.update(self.train_p, visible=False)
-
-        # if the datalen is zero update with the one epoch just ended
-        if self.train_data_len == 0:
-            self.train_data_len = self.progress.tasks[self.train_p].completed
-
-        self.progress.reset(
-            task_id=self.train_p,
-            total=self.train_data_len,
-            start=False,
-            visible=False,
-            cur_epoch=epoch,
-            n_epochs=self.n_epochs,
-            mode="Train",
-        )
-
-        od = self.build_od(logs, loss, epoch)
-        self.progress.update_info_table(od, "train")
-
-    def on_validation_begin(self, epoch: int):
-        self.progress.reset(
-            task_id=self.test_p,
-            total=self.test_data_len,
-            start=False,
-            visible=False,
-            cur_epoch=epoch,
-            n_epochs=self.n_epochs,
-            mode="Test",
-        )
-
-        self.progress.start_task(self.test_p)
-        self.progress.update(self.test_p, visible=True)
-
-    def on_validation_end(self, loss: float, logs: Interaction, epoch: int):
-        self.progress.stop_task(self.test_p)
-        self.progress.update(self.test_p, visible=False)
-
-        # if the datalen is zero update with the one epoch just ended
-        if self.test_data_len == 0:
-            self.test_data_len = self.progress.tasks[self.test_p].completed
-
-        self.progress.reset(
-            task_id=self.test_p,
-            total=self.test_data_len,
-            start=False,
-            visible=False,
-            cur_epoch=epoch,
-            n_epochs=self.n_epochs,
-            mode="Test",
-        )
-
-        od = self.build_od(logs, loss, epoch)
-        self.progress.update_info_table(od, "test")
-
-    def on_train_end(self):
-        self.progress.stop()
-
-    def on_batch_end(
-        self, logs: Interaction, loss: float, batch_id: int, is_training: bool = True
-    ):
-        if is_training:
-            self.progress.update(self.train_p, refresh=True, advance=1)
-        else:
-            self.progress.update(self.test_p, refresh=True, advance=1)
->>>>>>> 9c4732ffb57be8aa6b1e3bb7bcfb6aa4488225a0
