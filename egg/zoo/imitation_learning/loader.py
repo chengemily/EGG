@@ -37,7 +37,7 @@ def load_interaction(file):
     return x
 
 
-def load_all_interactions(rootdir: str, mode: str = 'train', last_only: bool=False) -> Tuple[Sequence, Sequence]:
+def load_all_interactions(rootdir: str, mode: str = 'train', last_only: bool=False, last_epoch: int=2000, n_samples: int=20) -> Tuple[Sequence, Sequence]:
     """
     Loads all interactions and epoch list such that they are ordered ascending by random seed.
     if "last" then only loads the last epoch.
@@ -45,17 +45,31 @@ def load_all_interactions(rootdir: str, mode: str = 'train', last_only: bool=Fal
     p = Path(rootdir)
     random_seeds = [f for f in p.iterdir() if f.is_dir()]
     random_seeds = sorted(random_seeds, key = lambda p: int(str(p).split('_')[-1]))
-    dir_for_mode = [str(rs) + '/interactions/{}'.format(mode) for rs in random_seeds]
-    
+    # dir_for_mode = [str(rs) + '/interactions/{}'.format(mode) for rs in random_seeds]
+    dir_for_mode = [str(rs) + '/{}'.format(mode) for rs in random_seeds]
+
     all_interactions = []
     global_epoch_list = []
     for rs in dir_for_mode:
         p = Path(rs)
         epochs = [str(f) for f in p.iterdir() if f.is_dir()]
         epochs = sorted(epochs, key=lambda x: int(x.split('_')[-1]))
-        if last_only: epochs = [epochs[-1]]
+        epoch_header = '/'.join(epochs[0].split('/')[:-1])
 
-        all_interactions.append([load_interaction(epoch + '/interaction_gpu0') for epoch in epochs])
+        if last_only:
+            # print(epochs)
+            # print(epochs)
+            epochs = [epoch_header + '/epoch_{}'.format(last_epoch)]
+            # epochs = [epochs[-1]]
+            # if 'experts_2' in epoch_header: epochs = [epoch_header + '/epoch_1900']
+            # print(epochs)
+        else:
+            idx = np.round(np.linspace(0, len(epochs) - 1, n_samples)).astype(int)
+            # epochs = list(np.array(epochs)[idx])
+            epochs = [epoch_header + '/epoch_{}'.format(200 * i) for i in range(20)]
+
+        interactions = [load_interaction(epoch + '/interaction_gpu0') for epoch in epochs]
+        all_interactions.append(interactions)
 
         this_rs_epoch_list = [int(str(epoch).split('_')[-1]) for epoch in epochs]
         global_epoch_list = this_rs_epoch_list if \
@@ -111,13 +125,14 @@ def interaction_to_df(interaction: Dict) -> pd.DataFrame:
     return df_interaction
 
 
-def load_bc_checkpoints(from_rs=0, to_rs=101):
-    with open('/ccc/scratch/cont003/gen13547/chengemi/EGG/bc_checkpoints/bc_randomseed_{}_from_randomseed_{}_metadata.pkl'.format(to_rs, from_rs), 'rb') as f:
+def load_bc_checkpoints(from_rs=0, to_rs=101, ext=""):
+    with open('/homedtcl/echeng/EGG/bc_checkpoints/{}bc_randomseed_{}_from_randomseed_{}_metadata.pkl'.format(ext,
+            to_rs, from_rs), 'rb') as f:
         x = pickle.load(f)
     return x
 
 
-def log_performance(perf_log, r_loss, s_loss, r_acc, s_acc, mean_loss, acc, acc_or, t_speaker, t_receiver):
+def log_performance(perf_log, r_loss, s_loss, r_acc, s_acc, mean_loss, acc, acc_or, t_speaker, t_receiver, topsim):
     perf_log['r_loss'].append(r_loss)
     perf_log['s_loss'].append(s_loss)
     perf_log['r_acc'].append(r_acc)
@@ -128,10 +143,11 @@ def log_performance(perf_log, r_loss, s_loss, r_acc, s_acc, mean_loss, acc, acc_
     perf_log['epoch'].append(max(t_speaker, t_receiver))
     perf_log['epoch_speaker'].append(t_speaker)
     perf_log['epoch_receiver'].append(t_receiver)
+    perf_log['topsim'].append(topsim)
 
 
 def save_behavioral_clones(bc_args, params, new_receiver, new_sender, optimizer_r, optimizer_s, metadata_path, metrics, expert_seed):
-    file_prefix = '/ccc/scratch/cont003/gen13547/chengemi/EGG/bc_checkpoints/bc_randomseed_{}_from_randomseed_{}'.format(
+    file_prefix = '/homedtcl/echeng/EGG/bc_checkpoints/bc_randomseed_{}_from_randomseed_{}'.format(
         bc_args.bc_random_seed, expert_seed)
 
     torch.save({
@@ -199,10 +215,13 @@ def resave_compo_metrics_on_whole_dataset(metadata_path: str):
         pickle.dump(checkpoint_wrapper, f)
 
 
-def expert_setup(opts):
-    generalization_holdout_loader, uniform_holdout_loader, full_data_loader, train_loader, validation_loader, \
-    train, validation = compo_vs_generalization.load_data(opts)
-
+def expert_setup(opts, data=None):
+    if data is None:
+        generalization_holdout_loader, uniform_holdout_loader, full_data_loader, train_loader, validation_loader, \
+        train, validation = compo_vs_generalization.load_data(opts)
+    else:
+        generalization_holdout_loader, uniform_holdout_loader, full_data_loader, train_loader, validation_loader, \
+        train, validation = data
     sender, receiver = compo_vs_generalization.define_agents(opts)
 
     loss = DiffLoss(opts.n_attributes, opts.n_values)
@@ -228,15 +247,13 @@ def expert_setup(opts):
     validation_permuted = random_state.permutation(len(validation.examples))
     metrics_evaluator = CompoEvaluator(
         [validation.examples[i] for i in validation_permuted[:100]],
-    metrics_evaluator = CompoEvaluator(
-        validation.examples,
         opts.device,
         opts.n_attributes,
         opts.n_values,
         opts.vocab_size + 1,
         opts.distributed_context.is_distributed,
         is_population=False,
-        freq=opts.stats_freq,
+        # freq=opts.stats_freq,
     )
 
     loaders = []
@@ -280,7 +297,6 @@ def expert_setup(opts):
 
 def get_bc_params(params):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_epochs_bc", type=int, default=300, help="Number of epochs for BC training")
     parser.add_argument("--n_epochs_bc", type=int, default=100, help="Number of epochs for BC training")
     parser.add_argument('--loss', type=str, choices=['kl', 'cross_entropy'], default='cross_entropy')
     parser.add_argument(
@@ -293,7 +309,6 @@ def get_bc_params(params):
         "--convergence_epsilon",
         type=float,
         default=0.0,
-        default=1e-2, # prev: 1e-4 for bc experiments.
         help="Stop training when gradient norm is less than epsilon."
     )
     parser.add_argument(
@@ -320,17 +335,21 @@ def get_bc_params(params):
     )
     parser.add_argument(
         '--imitation_reinforce',
-        type=bool,
-        default=False,
+        type=int,
+        default=0,
         help="Set True if you want imitation to be done via REINFORCE"
+    )
+    parser.add_argument(
+        '--entropy_weight',
+        type=float,
+        default=0.1,
     )
     parser.add_argument(
         '--sender_reward',
         type=str,
         default='cross_entropy',
         choices=['cross_entropy', 'accuracy'],
-        help='Choice of sender reward, either (-) cross entropy or accuracy.'
-        default=101
+        help='Choice of sender reward, either (-) cross entropy or accuracy.',
     )
 
     args = core.init(arg_parser=parser, params=params)

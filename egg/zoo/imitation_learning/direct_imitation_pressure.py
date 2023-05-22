@@ -23,7 +23,7 @@ from egg.zoo.imitation_learning.archs import (
     Sender,
 )
 
-from egg.zoo.imitation_learning.callbacks import *
+from egg.zoo.imitation_learning.callbacks import CompoEvaluator, HoldoutEvaluator
 from egg.zoo.compo_vs_generalization.train import *
 
 from egg.zoo.imitation_learning.loader import *
@@ -40,10 +40,7 @@ def boolean_string(s):
 def imit_params(params):
     parser = argparse.ArgumentParser()
     parser.add_argument('--loss', type=str, choices=['kl', 'cross_entropy'], default='cross_entropy')
-    parser.add_argument('--sender_rcvr_imitation_reinforce_weight', type=float, default=0.0)
-    parser.add_argument('--kick', type=str, choices=['none', 'imitation', 'random'], default='none')
     parser.add_argument('--ablation', type=str, choices=['all', 'sender_only', 'receiver_only', 'none'], default='all')
-    parser.add_argument('--turn_taking', type=str, choices=['fixed', 'convergence', 'simultaneous'], default='fixed')
     parser.add_argument('--imitation_weight', type=float, default=0.0,
                         help="Weight of imitation reward compared to original task reward (weight=1)")
     parser.add_argument('--imitation_reinforce', type=boolean_string, default=False,
@@ -51,8 +48,6 @@ def imit_params(params):
                              "imitation_weight-ed REINFORCE.")
     parser.add_argument('--receiver_reinforce', type=int, default=0,
                         help="If True, trains receiver also by REINFORCE in the actual game.")
-    parser.add_argument('--sample_pairs', type=boolean_string, default=False)
-    parser.add_argument('--n_turns', type=int, default=50)
     parser.add_argument("--n_attributes",
                         type=int,
                         default=4, help="")
@@ -73,7 +68,7 @@ def imit_params(params):
                         help='Size of hidden layer of both agents')
     parser.add_argument('--population_size',
                         type=int,
-                        default=2,
+                        default=3,
                         help='Population size (must be an even number)')
     parser.add_argument(
         "--sender_entropy_coeff",
@@ -150,8 +145,7 @@ def main(params, train_mode=True):
 
     optimizer = torch.optim.Adam(game.parameters(), lr=opts.lr)
 
-    epochs_to_save = list(range(opts.stats_freq, opts.n_turns * opts.n_epochs + 1, opts.stats_freq)) #+ \
-                     # list(range(1, opts.n_turns * opts.n_epochs + 1, opts.stats_freq))
+    epochs_to_save = list(range(opts.stats_freq, opts.n_epochs + 1, opts.stats_freq)) #+ \
     epochs_to_save = sorted(epochs_to_save)
 
     random_state = np.random.RandomState(seed=1)
@@ -224,7 +218,7 @@ def main(params, train_mode=True):
             callback.on_train_begin(trainer)
         # holdout_evaluator.evaluate()
 
-        trainer.train(opts.n_turns * opts.n_epochs)
+        trainer.train(opts.n_epochs)
 
     print("---End--")
 
@@ -291,10 +285,6 @@ if __name__ == "__main__":
         print(args)
         return main(args)
 
-    # args = sys.argv.copy()[1:]
-    # args.append('--random_seed')
-    # args.append(0)
-    # main(args)
     
     procs = [launch_training(
         i, {

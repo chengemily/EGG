@@ -9,7 +9,6 @@ from egg.core import RnnReceiverReinforce
 
 
 def bc_agents_setup(opts, bc_opts, device, new_sender, new_receiver):
-    print(12)
     # new sender should be imitator agent with forcing
     if bc_opts.imitation_reinforce:
         new_sender = RnnSenderReinforceImitator(
@@ -22,12 +21,6 @@ def bc_agents_setup(opts, bc_opts, device, new_sender, new_receiver):
         )
         new_sender = PlusOneWrapper(new_sender)
 
-        new_receiver = RnnReceiverReinforce(new_receiver.agent,
-                                            opts.vocab_size,
-                                            opts.receiver_emb,
-                                            opts.hidden,
-                                            cell=opts.receiver_cell)
-    print(30)
     return RnnSenderBC(new_sender, opts, bc_opts, device), \
            RnnReceiverBC(new_receiver, opts, bc_opts, device)
 
@@ -73,15 +66,12 @@ class RnnReceiverBC(nn.Module):
         rf_loss = ((loss.detach() - self.mean_baseline) * log_probs)
         if self.training: self.update_baseline(loss)
 
-        return rf_loss - self.opts.entropy_weight * entropy
+        return rf_loss - entropy * self.bc_opts.entropy_weight
 
     def forward(self, message):
         message = message.to(self.device)
-        print(80)
-        receiver_output, log_prob_r, entropy_r, metadata = self.agent(message - 1)
-        print(82)
-        self.device = device
-        self.to(device)
+        batch_size = message.shape[0]
+        receiver_output, log_prob_r, entropy_r, metadata = self.agent(message)# - 1)
 
         receiver_output = receiver_output.view(
             batch_size, self.opts.n_attributes, self.opts.n_values
@@ -97,15 +87,12 @@ class RnnReceiverBC(nn.Module):
         :param val: (bool) whether in evaluation mode
         :return: cross entropy loss
         """
-<<<<<<< HEAD
-        print(96)
         if val:
             with torch.no_grad():
                 receiver_output, log_prob_r, entropy_r = self.forward(interaction.message)
         else:
             receiver_output, log_prob_r, entropy_r = self.forward(interaction.message)
 
-        print(103)
         batch_size = receiver_output.shape[0]
 
         interaction.receiver_output = interaction.receiver_output.to(self.device)
@@ -113,13 +100,11 @@ class RnnReceiverBC(nn.Module):
             batch_size, self.opts.n_attributes, self.opts.n_values
         )
         interaction_output_labels = interaction.receiver_output.argmax(dim=-1)
-        print(111)
         accuracy = torch.eq(
             receiver_output.argmax(dim=-1), interaction_output_labels
         ).sum() / torch.numel(interaction_output_labels)
-        print(115)
 
-        sender_aware = 'sender_aware' in aux_info and aux_info['sender_aware']
+        # sender_aware = 'sender_aware' in aux_info and aux_info['sender_aware']
         imitation_reinforce_for_sender = 0
 
         if expert is None:
@@ -128,8 +113,16 @@ class RnnReceiverBC(nn.Module):
                 if not self.use_reinforce:
                     r_loss = F.cross_entropy(receiver_output.transpose(1, 2), interaction_output_labels)
                 else:
-                    loss = F.cross_entropy(receiver_output.transpose(1, 2), interaction_output_labels, reduction='none')
+                    # loss = F.cross_entropy(receiver_output.transpose(1, 2), interaction_output_labels, reduction='none')
+                    distr = Categorical(logits=F.log_softmax(receiver_output, dim=-1))
+                    entropy_r = distr.entropy()
+                    sample = distr.sample()  # 512 x 6 (good, these are labels per-attribute)
+                    acc = (sample == interaction_output_labels).float()
+                    loss = -acc
+
+                    log_prob_r = distr.log_prob(sample)  # 512 x 6
                     r_loss = self.get_reinforce_loss(loss, log_prob_r, entropy_r)
+                    r_loss = r_loss.mean(dim=-1).mean()
             else:
                 #elif self.opts.loss == 'kl':
                 r_loss = F.kl_div(
@@ -137,48 +130,48 @@ class RnnReceiverBC(nn.Module):
                     F.softmax(interaction.receiver_output, dim=-1),
                     reduction='batchmean'
                 )
-        else:
-            if sender_aware:
-                expert_sender = aux_info['expert_sender']
-                rcvr_input, log_prob_s, _, _ = expert_sender(interaction.sender_input.to(self.device))
-            else:
-                rcvr_input = interaction.message.to(self.device)
-
-            expert_output, log_prob_r, _ = expert(rcvr_input)
-            if not imitation:
-                expert_output = expert_output.detach()
-
-            # Calculate loss for receiver
-            expert_output = expert_output.view(
-                batch_size, self.opts.n_attributes, self.opts.n_values
-            )
-
-            # In case we need to scale losses differently
-            r_loss_expert = F.kl_div(nn.LogSoftmax(dim=-1)(receiver_output.detach()),
-                                 F.softmax(expert_output, dim=-1), reduction='batchmean')
-            if self.opts.loss == 'cross_entropy':
-                # add entropy term of expert.
-                entropy = HLoss()
-                r_loss_expert += entropy(expert_output).mean()
-
-            r_loss_student = F.kl_div(nn.LogSoftmax(dim=-1)(receiver_output),
-                                 F.softmax(expert_output.detach(), dim=-1), reduction='batchmean')
-
-            r_loss = r_loss_student + self.opts.imitation_weight
-            
-	    # Calculate reinforce loss for sender if applicable.
-            if sender_aware:
-                # add the reinforce loss
-                message_length = find_lengths(rcvr_input)
-                effective_log_prob_s = torch.zeros_like(log_prob_r)
-
-                for i in range(rcvr_input.size(1)):
-                    not_eosed = (i < message_length).float()
-                    effective_log_prob_s += log_prob_s[:, i] * not_eosed
-
-                imitation_reinforce_for_sender = (log_prob_s * r_loss.detach()).mean()
-
-            r_loss = r_loss.mean()
+        # else:
+        #     if sender_aware:
+        #         expert_sender = aux_info['expert_sender']
+        #         rcvr_input, log_prob_s, _, _ = expert_sender(interaction.sender_input.to(self.device))
+        #     else:
+        #         rcvr_input = interaction.message.to(self.device)
+        #
+        #     expert_output, log_prob_r, _ = expert(rcvr_input)
+        #     if not imitation:
+        #         expert_output = expert_output.detach()
+        #
+        #     # Calculate loss for receiver
+        #     expert_output = expert_output.view(
+        #         batch_size, self.opts.n_attributes, self.opts.n_values
+        #     )
+        #
+        #     # In case we need to scale losses differently
+        #     r_loss_expert = F.kl_div(nn.LogSoftmax(dim=-1)(receiver_output.detach()),
+        #                          F.softmax(expert_output, dim=-1), reduction='batchmean')
+        #     if self.opts.loss == 'cross_entropy':
+        #         # add entropy term of expert.
+        #         entropy = HLoss()
+        #         r_loss_expert += entropy(expert_output).mean()
+        #
+        #     r_loss_student = F.kl_div(nn.LogSoftmax(dim=-1)(receiver_output),
+        #                          F.softmax(expert_output.detach(), dim=-1), reduction='batchmean')
+        #
+        #     r_loss = r_loss_student + self.opts.imitation_weight
+        #
+	    # # Calculate reinforce loss for sender if applicable.
+        # #     if sender_aware:
+        # #         # add the reinforce loss
+        # #         message_length = find_lengths(rcvr_input)
+        # #         effective_log_prob_s = torch.zeros_like(log_prob_r)
+        # #
+        # #         for i in range(rcvr_input.size(1)):
+        # #             not_eosed = (i < message_length).float()
+        # #             effective_log_prob_s += log_prob_s[:, i] * not_eosed
+        # #
+        # #         imitation_reinforce_for_sender = (log_prob_s * r_loss.detach()).mean()
+        #
+        #     r_loss = r_loss.mean()
         return r_loss, accuracy, {'reinforce_loss': imitation_reinforce_for_sender}
 
 
@@ -209,7 +202,7 @@ class RnnSenderBC(nn.Module):
         rf_loss = ((loss.detach() - self.mean_baseline) * log_probs)
         if self.training: self.update_baseline(loss)
 
-        return rf_loss - 0.1 * entropy
+        return rf_loss - self.bc_opts.entropy_weight * entropy
 
     def forward(self, sender_input, ground_truth_sequence=None):
         sender_input = sender_input.to(self.device)

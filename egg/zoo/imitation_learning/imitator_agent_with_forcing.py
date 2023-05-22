@@ -36,9 +36,14 @@ class RnnSenderReinforceImitator(nn.Module):
 
         assert max_len >= 1, "Cannot have a max_len below 1"
         self.max_len = max_len
+        # self.layer_norm_h = nn.LayerNorm(hidden_size)
+        # self.layer_norm_c = nn.LayerNorm(hidden_size)
 
         self.hidden_to_output = nn.Linear(hidden_size, vocab_size)
+
         self.embedding = nn.Embedding(vocab_size, embed_dim)
+        # self.batch_norm = nn.BatchNorm1d(embed_dim, momentum=5.0, track_running_stats=False)
+
         self.sos_embedding = nn.Parameter(torch.zeros(embed_dim))
         self.embed_dim = embed_dim
         self.vocab_size = vocab_size
@@ -87,9 +92,12 @@ class RnnSenderReinforceImitator(nn.Module):
             for i, layer in enumerate(self.cells):
                 if isinstance(layer, nn.LSTMCell):
                     h_t, c_t = layer(input, (prev_hidden[i], prev_c[i]))
+                    c_t = self.layer_norm_c(c_t)
                     prev_c[i] = c_t
                 else:
                     h_t = layer(input, prev_hidden[i])
+
+                # h_t = self.layer_norm_h(h_t)
                 prev_hidden[i] = h_t
                 input = h_t
 
@@ -108,10 +116,12 @@ class RnnSenderReinforceImitator(nn.Module):
             # Replace next input with the ground truth
             if self.training and ground_truth_sequence is not None:
                 input = self.embedding(ground_truth_sequence[:, step])
+
             else:
                 input = self.embedding(x)
 
             sequence.append(x)
+            # input = self.batch_norm(input)
 
         predicted_dist = torch.stack(predicted_dist).transpose(1, 0)
         sequence = torch.stack(sequence).permute(1, 0)

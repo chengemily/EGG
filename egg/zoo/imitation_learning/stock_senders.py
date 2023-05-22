@@ -77,7 +77,7 @@ class CompositionalSender:
         sender_input_att_val = sender_input.reshape((batch_size, self.n_attributes, self.n_values))
         sender_input_att = torch.argmax(sender_input_att_val, dim=-1).cpu()
         sender_input_att.apply_(lambda x: self.value_symbol_lookup[int(x)])
-        return torch.LongTensor(sender_input_att)
+        return torch.LongTensor(sender_input_att), _, _, _
 
 
 class NoncompositionalSender:

@@ -10,6 +10,7 @@ import egg.core as core
 from egg.core.util import find_lengths
 from egg.core import EarlyStopperAccuracy
 from egg.core import CheckpointSaver
+from egg.core.language_analysis import TopographicSimilarity
 from egg.zoo.imitation_learning.archs import (
     PlusOneWrapper,
     Receiver,
@@ -46,20 +47,27 @@ def eval_bc_prediction(new_sender, new_receiver, trainer, t=None, checkpoint_pat
 
 
 def eval_expert_original_task(trainer):
-    # print('About to evaluate og agents on og task')
     mean_loss, interaction = trainer.eval()
+    # print(interaction.message[:10])
+    # print(interaction.receiver_output[:10])
     acc_or, acc = interaction.aux['acc_or'].mean(), interaction.aux['acc'].mean()
     print('Expert Loss: {}. Acc_or: {}. Acc: {}'.format(mean_loss, acc_or, acc))
-    # input()
     return mean_loss, acc, acc_or
 
 
-def eval_bc_original_task(new_trainer, t=None, checkpoint_path=None):
+def eval_bc_original_task(new_trainer, t=None):
     mean_loss, interaction = new_trainer.eval()
+    # print(interaction.message[:10])
+    # print(interaction.receiver_output.shape)
+    # print(interaction.receiver_output[:10])
+    # input()
     acc_or, acc = interaction.aux['acc_or'].mean(), interaction.aux['acc'].mean()
 
+    # Evaluate topsim
+    topsim = TopographicSimilarity.compute_topsim(interaction.sender_input[:500], interaction.message[:500])
+
     print('Epoch: {}; Original Task Loss: {}. Acc_or: {}. Acc: {}'.format(t, mean_loss, acc_or, acc))
-    return mean_loss, acc, acc_or # new results
+    return mean_loss, acc, acc_or, topsim # new results
 
 
 def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, trainer,
@@ -79,15 +87,14 @@ def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, traine
             new_receiver.eval()
             r_loss, s_loss, r_acc, s_acc = eval_bc_prediction(new_sender, new_receiver, trainer, t)
             if new_trainer is not None:
-                mean_loss, acc, acc_or = eval_bc_original_task(new_trainer, t)
-
+                mean_loss, acc, acc_or, topsim = eval_bc_original_task(new_trainer, t)
             if perf_log is not None:
                 log_performance(perf_log, r_loss.item(),
                             s_loss.item(), r_acc.item(), s_acc.item(), mean_loss,
-                            acc.item(), acc_or.item(), sender_converged_epoch, receiver_converged_epoch)
+                            acc.item(), acc_or.item(), sender_converged_epoch, receiver_converged_epoch, topsim)
 
         _, interaction = trainer.eval(trainer.train_data)
-
+        # print(interaction.message[10:])
         trainer.game.train()
 
         if not new_receiver_converged:
@@ -104,7 +111,7 @@ def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, traine
             reinforce_loss_for_sender[t] = aux_info['reinforce_loss']
             cumu_r_loss[t] = r_loss
             cumu_r_acc[t] = r_acc
-            new_receiver_converged = r_acc >= 0.999
+            new_receiver_converged = r_acc >= 1.0
             receiver_converged_epoch = t
         if not new_sender_converged:
             new_sender.train()
@@ -117,12 +124,12 @@ def train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, traine
             )
             cumu_s_loss[t] = s_loss
             cumu_s_acc[t] = s_acc
-            new_sender_converged = s_acc >= 0.999
+            new_sender_converged = s_acc >= 1.0
             sender_converged_epoch = t
 
         if new_receiver_converged and new_sender_converged:
             print('Both receiver and sender gradients < epsilon={}'.format(bc_args.convergence_epsilon))
-            break
+            # break
         print('Epoch: {}; Receiver loss: {}; Sender loss: {}; R acc: {}; S acc: {}'.format(t, r_loss, s_loss, r_acc, s_acc))
 
     cumu_s_loss += sender_aware_weight * reinforce_loss_for_sender
@@ -143,23 +150,25 @@ def train_epoch(optimizer, agent, interaction, expert=None, imitation=False, aux
 def main(bc_params):
     bc_args = get_bc_params(bc_params)
 
-    metadata_path = '/ccc/scratch/cont003/gen13547/chengemi/EGG/checkpoints/basic_correlations/saved_models/' + \
+    metadata_path = './checkpoints/basic_correlations/saved_models/' + \
                  'checkpoint_wrapper_randomseed{}.pkl'.format(bc_args.expert_seed)
 
     random.seed(bc_args.bc_random_seed)
     checkpoint_wrapper = load_metadata_from_pkl(metadata_path)
 
     params = checkpoint_wrapper['params']
-    params.append('--load_from_checkpoint={}'.format(checkpoint_wrapper['checkpoint_path']))
+    checkpoint_path = '/homedtcl/echeng/' + '/'.join(checkpoint_wrapper['checkpoint_path'].split('/')[6:])
+    params.append('--load_from_checkpoint={}'.format(checkpoint_path))
     params = list(filter(lambda x: 'random_seed' not in x, params))
     params.append('--random_seed={}'.format(bc_args.bc_random_seed))
     opts = compo_vs_generalization.get_params(params)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else 'cpu')
-
+    print('device: ', device)
     # New agents
     new_sender, new_receiver = bc_agents_setup(opts, bc_args, device,
                                                *compo_vs_generalization.define_agents(opts))
+
     optimizer_r = torch.optim.Adam(new_receiver.parameters(), lr=opts.lr)
     optimizer_s = torch.optim.Adam(new_sender.parameters(), lr=opts.lr)
 
@@ -179,12 +188,11 @@ def main(bc_params):
         'acc_or': [],
         'epoch': [],
         'epoch_speaker': [],
-        'epoch_receiver': []
+        'epoch_receiver': [],
+        'topsim': []
     }
-    
     cumu_s_loss, cumu_r_loss, sender_converged_epoch, receiver_converged_epoch, s_acc, r_acc, cumu_s_acc, cumu_r_acc\
             = train_bc(bc_args, new_sender, new_receiver, optimizer_s, optimizer_r, trainer, new_trainer, perf_log=perf_log)
-
     t = max(sender_converged_epoch, receiver_converged_epoch)
 
     # Last validation score
@@ -194,7 +202,7 @@ def main(bc_params):
 
     # Integrate with og environment on validation
     print('Last validation score on original task')
-    mean_loss, acc, acc_or = eval_bc_original_task(new_trainer, t=t)
+    mean_loss, acc, acc_or, topsim = eval_bc_original_task(new_trainer, t=t)
 
     # Original model score
     print('Expert validation on original task')
@@ -202,7 +210,7 @@ def main(bc_params):
 
     log_performance(perf_log, r_loss.item(), s_loss.item(), r_acc.item(), s_acc.item(), mean_loss, acc.item(),
                     acc_or.item(), sender_converged_epoch,
-                    receiver_converged_epoch)
+                    receiver_converged_epoch, topsim)
 
     # Save BC model
     if bc_args.save_bc:

@@ -32,13 +32,11 @@ class DirectImitationGame(nn.Module):
                  baseline_type: Baseline = MeanBaseline,
                  train_logging_strategy: LoggingStrategy = None,
                  test_logging_strategy: LoggingStrategy = None,
-                 ablation: str = 'all',
-                 sender_aware_weight: float = 0.0):
+                 ablation: str = 'all'):
         super(DirectImitationGame, self).__init__()
 
         self.opts = opts
         self.device = opts.device
-        self.sample_pairs = opts.sample_pairs
         self.train_expert_sender = ablation in ['all', 'sender_only']
         self.train_expert_receiver = ablation in ['all', 'receiver_only']
 
@@ -46,7 +44,6 @@ class DirectImitationGame(nn.Module):
         self.imitation_reinforce = opts.imitation_reinforce
 
         self.imitation_weight = self.opts.imitation_weight
-        self.sender_aware_weight = sender_aware_weight
         self.sender_entropy_coeff = opts.sender_entropy_coeff
         self.receiver_entropy_coeff = 0.0
         self.loss = loss
@@ -66,34 +63,9 @@ class DirectImitationGame(nn.Module):
         self.receivers = nn.ModuleList(receivers)
         assert len(self.senders) == len(self.receivers)
         self.number_of_pairs = len(self.senders)
-        self.comm_pairings = None
-        self.imitation_pairings = None
 
         self.baselines = [defaultdict(baseline_type) for _ in range(self.number_of_pairs)]
         self.comm_loss = loss
-
-    def sample_pairings(self, derangement=False):
-        # https://stackoverflow.com/questions/26554211/numpy-shuffle-with-constraint
-        def random_derangement(N):
-            original = np.arange(N)
-            new = np.random.permutation(N)
-            same = np.where(original == new)[0]
-            while len(same) != 0:
-                swap = same[np.random.permutation(len(same))]
-                new[same] = new[swap]
-                same = np.where(original == new)[0]
-                if len(same) == 1:
-                    swap = np.random.randint(0, N)
-                    new[[same[0], swap]] = new[[swap, same[0]]]
-            return new
-        if derangement: return random_derangement(self.number_of_pairs)
-        pairs = list(range(self.number_of_pairs))
-        if self.sample_pairs: random.shuffle(pairs)
-        return pairs
-
-    def init_pairings(self):
-        self.comm_pairings = self.sample_pairings()  # sender i is paired with receiver comm_pairings[j]
-        self.imitation_pairings = self.sample_pairings(derangement=True)
 
     def evaluate_on_game(self, sender, receiver, sender_input, labels, receiver_input=None, aux_input=None):
         message, log_prob_s, entropy_s, probas_s = sender(sender_input, aux_input)
@@ -133,84 +105,79 @@ class DirectImitationGame(nn.Module):
         )
         return comm_loss, interaction, effective_entropy_s, effective_log_prob_s, effective_log_prob_r, probas_s, receiver_output
 
-    def compute_imitation_loss(self, pairings, batch_size, interactions, log_probs, logits, agent_type: str):
+    def compute_imitation_loss(self, batch_size, interactions, log_probs, logits, agent_type: str):
         assert agent_type in ['sender', 'receiver']
 
-        imi_losses = [torch.zeros(batch_size) for _ in range(self.number_of_pairs)]
+        imi_losses = [0] * self.number_of_pairs
 
-        for i in range(0, len(pairings), 2):
-            a, b = pairings[i], pairings[i + 1]
-            if agent_type == 'sender':
-                imi_losses[a] = F.cross_entropy(
-                    logits[a], # remove the end token
-                    interactions[b].message.to(self.device)[:,:self.opts.max_len],
-                    reduction='none'
-                ).view(batch_size, self.opts.max_len).mean(dim=-1)
-                imi_losses[b] = F.cross_entropy(
-                    logits[b],
-                    interactions[a].message.to(self.device)[:,:self.opts.max_len],
-                    reduction='none'
-                ).view(batch_size, self.opts.max_len).mean(dim=-1)
+        for i in range(self.number_of_pairs):
+            # Compute the imitation loss for pair i by pairing it with all other agents.
+            for j in range(i + 1, self.number_of_pairs):
+                if agent_type == 'sender':
+                    if not self.imitation_reinforce:
+                        # Supervised loss is cross-entropy loss
+                        imi_losses[i] += F.nll_loss(logits[i], interactions[j].message, reduction='none')
+                        imi_losses[j] += F.nll_loss(logits[j], interactions[i].message, reduction='none')
+                    else:
+                        # Imitation loss is accuracy
+                        acc = (interactions[i].message == interactions[j].message).float()
+                        imi_losses[i] += acc
+                        imi_losses[j] += acc
 
-            elif agent_type == 'receiver':
-                receiver_output_a = logits[a].view(
-                        batch_size, self.opts.n_attributes, self.opts.n_values
-                    ).transpose(1, 2).to(self.device)
-                receiver_output_b = logits[b].view(
-                        batch_size, self.opts.n_attributes, self.opts.n_values
-                    ).transpose(1, 2).to(self.device)
+                elif agent_type == 'receiver':
+                    # TODO
+                    receiver_output_a = logits[a].view(
+                            batch_size, self.opts.n_attributes, self.opts.n_values
+                        ).transpose(1, 2).to(self.device)
+                    receiver_output_b = logits[b].view(
+                            batch_size, self.opts.n_attributes, self.opts.n_values
+                        ).transpose(1, 2).to(self.device)
 
-                imi_losses[a] = F.cross_entropy(
-                    receiver_output_a,
-                    interactions[b].receiver_sample.to(self.device),
-                    reduction='none'
-                ).view(batch_size, self.opts.n_attributes).mean(dim=-1)
+                    imi_losses[a] = F.cross_entropy(
+                        receiver_output_a,
+                        interactions[b].receiver_sample.to(self.device),
+                        reduction='none'
+                    ).view(batch_size, self.opts.n_attributes).mean(dim=-1)
 
-                imi_losses[b] = F.cross_entropy(
-                    receiver_output_b,
-                    interactions[a].receiver_sample.to(self.device),
-                    reduction='none'
-                ).view(batch_size, self.opts.n_attributes).mean(dim=-1)
+                    imi_losses[b] = F.cross_entropy(
+                        receiver_output_b,
+                        interactions[a].receiver_sample.to(self.device),
+                        reduction='none'
+                    ).view(batch_size, self.opts.n_attributes).mean(dim=-1)
 
         if self.imitation_reinforce:
             imitation_policy_loss = [
-                (imi_losses[i].detach() - self.baselines[i]['{}_imit_loss'.format(agent_type)].predict(imi_losses[i].detach())) *
-                log_probs[i]
+                (
+                        imi_losses[i].detach() - \
+                        self.baselines[i]['{}_imit_loss'.format(agent_type)].predict(imi_losses[i].detach())
+                ) * log_probs[i]
                 for i in range(self.number_of_pairs)
             ]
-            loss = torch.sum(torch.stack(imitation_policy_loss, dim=0))
+            loss = torch.mean(torch.stack(imitation_policy_loss, dim=0)) # Take average imitation policy loss.
         else:
             # direct backprop
-            loss = torch.sum(torch.stack(imi_losses, dim=0))
+            loss = torch.mean(torch.stack(imi_losses, dim=0))
 
         return loss, imi_losses
 
     def forward(self, sender_input, labels, receiver_input=None, aux_input=None):
         batch_size = sender_input.size(0)
         # print(batch_size)
+
         r_imitation_policy_loss = torch.zeros(batch_size).to(self.device)
         s_imitation_policy_loss = torch.zeros(batch_size).to(self.device)
-        imi_r_losses = [torch.zeros(batch_size).to(self.device) for _ in range(self.number_of_pairs)]
-        imi_s_losses = [torch.zeros(batch_size).to(self.device) for _ in range(self.number_of_pairs)]
+
+        # Placeholder from imitation loss from every other agent
+        imi_r_losses = [torch.zeros(batch_size).to(self.device) for _ in range(self.number_of_pairs - 1)]
+        imi_s_losses = [torch.zeros(batch_size).to(self.device) for _ in range(self.number_of_pairs - 1)]
 
         # Evaluate the pairs, produce the comm and imi losses
         comm_losses, interactions, speaker_entropies, log_prob_ss, log_prob_rs, logits_ss, logits_rs = [], [], [], [], [], [], []
         # print(163)
 
-        # print(165)
-        # global eval_
-        # def eval_(i):
-        #     j = self.comm_pairings[i]
-        #     return self.evaluate_on_game(self.senders[i], self.receivers[j], sender_input, labels, receiver_input, aux_input)
-        #
-        # pool = mp.Pool(self.number_of_pairs)
-        # comm_losses, interactions, speaker_entropies, log_prob_ss, log_prob_rs, logits_ss, logits_rs = \
-        #     zip(*pool.map(eval_, range(self.number_of_pairs)))
-
         for i in range(self.number_of_pairs):
-            j = self.comm_pairings[i]
             comm_loss, interaction, ent_s, log_prob_s, log_prob_r, logits_s, logits_r = self.evaluate_on_game(
-                self.senders[i], self.receivers[j], sender_input, labels, receiver_input, aux_input
+                self.senders[i], self.receivers[i], sender_input, labels, receiver_input, aux_input
             )
             # print(171)
             comm_losses.append(comm_loss.to(self.device))
@@ -223,13 +190,15 @@ class DirectImitationGame(nn.Module):
 
         # Concatenates results from individual agents.
         interaction = Interaction.from_iterable(interactions)
-        interaction.aux['pairings'] = torch.Tensor(self.comm_pairings)
 
         # Compute game policy losses for sender
-        game_policy_losses = [(comm_losses[i].detach() - self.baselines[i]['comm_loss'].predict(comm_losses[i].detach()))\
-                              * log_prob_ss[i] for i in range(self.number_of_pairs)]
+        game_policy_losses = [
+            (comm_losses[i].detach() - self.baselines[i]['comm_loss'].predict(comm_losses[i].detach())) * log_prob_ss[i]
+            for i in range(self.number_of_pairs)
+        ]
         # print(185)
-        # Allow the two pairs' senders to imitate each other using REINFORCE, produce this loss.
+
+        # Get imitation loss for each other pair.
         if self.train_expert_sender or self.train_expert_receiver:
             if self.train_expert_receiver:
                 r_imitation_policy_loss, imi_r_losses = self.compute_imitation_loss(
@@ -246,7 +215,7 @@ class DirectImitationGame(nn.Module):
 
         # Compute policy loss with entropy term.
         entropy_term = sum([ent_s.mean() for ent_s in speaker_entropies]) * self.sender_entropy_coeff
-        imitation_policy_loss = (r_imitation_policy_loss + s_imitation_policy_loss).mean()
+        imitation_policy_loss = r_imitation_policy_loss + s_imitation_policy_loss
         game_policy_loss = torch.sum(torch.stack(game_policy_losses, dim=0))
         r_game_loss = sum([comm_loss.mean() for comm_loss in comm_losses])
 
