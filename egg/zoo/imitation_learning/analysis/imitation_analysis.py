@@ -9,6 +9,8 @@ import numpy as np
 import os
 from egg.zoo.imitation_learning.loader import load_all_interactions
 from egg.zoo.imitation_learning.analysis.stats_util import *
+from egg.core.language_analysis import *
+from egg.zoo.imitation_learning.callbacks import *
 
 import scipy.stats as stats
 
@@ -61,12 +63,38 @@ def convert_to_acc_df(all_interactions, acc_thres=-1):
 
         for i, epoch in enumerate(rs):
             for metric in epoch.aux:
+                if epoch.aux[metric] is None or 'expert_message' in metric:
+                    continue
+
                 if metric not in result_dict:
-                    result_dict[metric] = [None] * len(epochs)
+                    if 'imitator_message' not in metric:
+                        result_dict[metric] = [None] * len(epochs)
+                    else:
+                        expert_name = metric.split('_')[0]
+                        for compo in ['topographic_sim', 'positional_disent', 'bag_of_symbol_disent', 'context_independence']:
+                            result_dict[expert_name + '_' + compo] = [None] * len(epochs)
+
+                # if 'imitator_message' in metric:
+                #     expert_name = metric.split('_')[0]
+                #     # compute compo metrics
+                #     result_dict[expert_name + '_topographic_sim'][i] = TopographicSimilarity.compute_topsim(
+                #         epoch.sender_input[:100], epoch.aux[metric][:100])
+                #     result_dict[expert_name + '_positional_disent'][i] = Disent.posdis(epoch.sender_input[:100],
+                #                                                             epoch.aux[metric][:100])
+                #     result_dict[expert_name + '_bag_of_symbol_disent'][i] = Disent.bosdis(epoch.sender_input[:100],
+                #                                                             epoch.aux[metric][:100], 10)
+                #     result_dict[expert_name + '_context_independence'][i] = context_independence(6, 10,
+                #                                                                epoch.sender_input[:100],
+                #                                                                epoch.aux[metric][:100], 'cpu')
+
+                try:
+                    len(epoch.aux[metric])
+                except:
+                    continue
                 if len(epoch.aux[metric]) > 1:
                     if metric == 'sender_entropy':
                         result_dict[metric][i] = float(torch.mean(epoch.aux[metric][:-1]))
-                    elif metric in ['acc', 'acc_or'] or 'imitation' in metric:
+                    elif 'acc' in metric or 'acc_or' in metric or 'imitation' in metric or 'loss' in metric:
                         result_dict[metric][i] = float(torch.mean(epoch.aux[metric]))
                 else:
                     result_dict[metric][i] = epoch.aux[metric].item()
@@ -74,7 +102,7 @@ def convert_to_acc_df(all_interactions, acc_thres=-1):
         result_dict = {k: v for k, v in result_dict.items() if len(v)}
         results.append(result_dict)
 
-    separate_data = [pd.DataFrame(result) for result in results if np.max(result['acc']) > acc_thres]
+    separate_data = [pd.DataFrame(result) for result in results] #if np.max(result['acc']) > acc_thres]
     all_data = pd.concat(separate_data)
     all_data = all_data.groupby(all_data.index).agg(['mean', 'std', 'max'])
     all_data = all_data.head(len(epochs))
@@ -155,18 +183,20 @@ def plot(ylabel, ploty, plotx, xlabel='Epoch', agged_data=None, sep_data=None, e
         plt.savefig(savepath)
 
 
-def load_time_series_from_experiment(experiment_path, acc_thres=0.75, last_only=False):
+def load_time_series_from_experiment(experiment_path, acc_thres=0.75, last_only=False, n_samples=40):
     # load all interactions
-    agged_data, sep_data = {}, {}
+    agged_data, sep_data, last_interaction = {}, {}, {}
 
     for mode in ['train', 'validation']:
         print(experiment_path)
+        print(mode)
         try:
-            all_interactions = load_all_interactions(experiment_path, mode=mode, last_only=last_only)
+            all_interactions = load_all_interactions(experiment_path, mode=mode, last_only=last_only, n_samples=n_samples)
             agged_data[mode], sep_data[mode], num_seeds = convert_to_acc_df(
                 all_interactions,
                 acc_thres=acc_thres
             )
+            last_interaction[mode] = all_interactions[0]
         except FileNotFoundError:
             print('Files not found for mode={}.'.format(mode))
             continue
@@ -179,7 +209,7 @@ def load_time_series_from_experiment(experiment_path, acc_thres=0.75, last_only=
     # sep_data['validation'] = [pd.concat([sep_data['train'][min(i, len(sep_data['train']) - 1)].iloc[[0]], data_val])
     #                           for i, data_val in enumerate(sep_data['validation'])]
 
-    return agged_data, sep_data, num_seeds
+    return agged_data, sep_data, num_seeds, last_interaction
 
 
 def load_all_time_series(args, last_only=False) -> Tuple[Dict[str, list]]:
